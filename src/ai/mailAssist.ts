@@ -3,6 +3,7 @@ import { chat } from "../adapters/anthropic";
 import { runClaudeP } from "../adapters/claudeCode";
 import { selectCandidates, type Candidate } from "../core/vaultRetrieval";
 import { searchExcludes, settingsOf } from "../core/settings";
+import { SecretStore } from "../core/secrets";
 import type { GmailThread } from "../adapters/gmail";
 import type { MailConfig } from "../core/mailConfig";
 
@@ -82,9 +83,9 @@ export async function generateReplyDraft(
   if (config.backend === "claude-code") {
     raw = (await runClaudeP(prompt, config.claudeCmd)).text;
   } else {
-    const data = ((await plugin.loadData()) ?? {}) as { anthropic_api_key?: string };
-    if (!data.anthropic_api_key) throw new Error("Anthropic API キーが未設定です（設定で backend を claude-code にするか、キーを設定）");
-    raw = (await chat(data.anthropic_api_key, config.model, "", [{ role: "user", content: prompt }], 1500)).text;
+    const apiKey = await new SecretStore(plugin).get<string>("anthropic_api_key");
+    if (!apiKey) throw new Error("Anthropic API キーが未設定です（設定で backend を claude-code にするか、キーを設定）");
+    raw = (await chat(apiKey, config.model, "", [{ role: "user", content: prompt }], 1500)).text;
   }
   const { summary, replyDraft } = parseAssistOutput(raw);
   return { summary, replyDraft, sources: candidates.map((c) => c.path) };

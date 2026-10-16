@@ -120,7 +120,8 @@ Google OAuth uses a client you create yourself in Google Cloud. Requested scopes
 
 ### What is stored where
 
-- `<vault>/.obsidian/plugins/deck-dashboard/data.json`: settings, the Sheets sync configuration, and the Google OAuth client, Google tokens and Anthropic API key in plain text. Keep this file out of public repositories and shared vaults.
+- Credentials (the Google OAuth client, Google tokens and the Anthropic API key): on Obsidian 1.11.4 and later they are kept in Obsidian's secret storage (the device keychain), not in the vault folder. Values saved by older versions are moved there the first time they are used. Secret storage is not synced with the vault, so on another device you may need to sign in to Google or enter the API key again. On older Obsidian versions, or when secure storage is not available, they stay in `data.json` in plain text.
+- `<vault>/.obsidian/plugins/deck-dashboard/data.json`: settings and the Sheets sync configuration (spreadsheet IDs). Keep this file out of public repositories and shared vaults all the same.
 - `.dashboard` files: each widget's settings, including an iCal URL you paste. A private iCal address works like a password, so don't share a dashboard that contains one.
 - AI delegation logs and Sheets sync logs are written as notes in the folders you choose.
 

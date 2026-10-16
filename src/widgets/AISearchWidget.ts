@@ -6,6 +6,7 @@ import { runClaudeP } from "../adapters/claudeCode";
 import { wireInternalLinks } from "./linkHandler";
 import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED } from "../core/vaultRetrieval";
 import { searchExcludes } from "../core/settings";
+import { SecretStore } from "../core/secrets";
 import { t } from "../core/i18n";
 
 type Backend = "claude-code" | "api";
@@ -91,10 +92,6 @@ interface Settings {
 }
 
 
-interface PluginData {
-  anthropic_api_key?: string;
-}
-
 export const aiSearchWidget: WidgetDefinition<Settings> = {
   type: "ai-search",
   label: "AI Search (自然言語検索)",
@@ -113,10 +110,11 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
     el.empty();
     el.addClass("nd-widget-ai-search");
 
-    const data = ((await ctx.plugin.loadData()) ?? {}) as PluginData;
+    const secrets = new SecretStore(ctx.plugin);
+    const apiKey = settings.backend === "api" ? await secrets.get<string>("anthropic_api_key") : null;
 
     // API backend requires API key. claude-code backend doesn't.
-    if (settings.backend === "api" && !data.anthropic_api_key) {
+    if (settings.backend === "api" && !apiKey) {
       const empty = el.createDiv({ cls: "nd-empty" });
       empty.createEl("p", { text: "Anthropic API キーが未設定です (API backend用)。" });
       const btn = empty.createEl("button", { text: "🔑 APIキーを設定", cls: "mod-cta" });
@@ -129,9 +127,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
             ""
           );
           if (!key) return;
-          const next = ((await ctx.plugin.loadData()) ?? {}) as PluginData;
-          next.anthropic_api_key = key.trim();
-          await ctx.plugin.saveData(next);
+          await secrets.set("anthropic_api_key", key.trim());
           new Notice("APIキーを保存しました");
           void aiSearchWidget.render(el, settings, ctx);
         })();
@@ -205,9 +201,8 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
             `候補 ${candidates.length} 件 / claude -p (${settings.claudeCmd}) / ${ms}ms`
           );
         } else {
-          const apiKey = data.anthropic_api_key as string;
           const res = await chat(
-            apiKey,
+            apiKey ?? "",
             settings.model,
             system,
             [{ role: "user", content: user }],
