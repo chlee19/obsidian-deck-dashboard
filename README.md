@@ -1,5 +1,9 @@
 # Obsidian Deck
 
+![Downloads](https://raw.githubusercontent.com/yut0takagi/obsidian-deck-dashboard/main/.github/stats/badge.svg)
+
+![Download history](https://raw.githubusercontent.com/yut0takagi/obsidian-deck-dashboard/main/.github/stats/downloads.svg)
+
 A Composable dashboard plugin for Obsidian. Compose widgets (tasks, Dataview queries, Bases, calendars) in a draggable grid.
 
 **Status:** Phase 1 scaffold — opens `.dashboard` files in a custom view. No widgets yet.
