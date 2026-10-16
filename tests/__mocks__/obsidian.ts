@@ -153,3 +153,9 @@ function makeFakeEl(): any {
   };
   return el;
 }
+
+// Minimal moment stand-in: locale() drives i18n, format() is unused in tests
+// that rely on injected formatters.
+export const moment: any = Object.assign(() => ({ format: () => "" }), {
+  locale: () => "en",
+});
