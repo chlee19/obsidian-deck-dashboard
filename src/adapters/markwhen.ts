@@ -1,4 +1,4 @@
-// Minimal Markwhen-flavored parser tailored for this vault's タスク/ガント.mw.
+// Minimal Markwhen-flavored parser for the Gantt widget's .mw source file.
 // Supports:
 //   - Header tag colors: "#tagname: #colorhex"
 //   - "section <title>" lines
@@ -155,7 +155,7 @@ function parseISODate(s: string): Date | null {
 }
 
 function stripTrailingMeta(s: string): string {
-  // "クエスト... — ✅ 案件終了（...）" → keep first part
+  // "Launch prep — ✅ done (...)" → keep first part
   return s.split(/\s+—\s+/)[0].trim();
 }
 

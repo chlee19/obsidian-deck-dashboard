@@ -5,6 +5,9 @@ import {
   SessionEntry,
   getAISessionRegistry,
 } from "../core/AISessionRegistry";
+import { t } from "../core/i18n";
+import type { DeckSettings } from "../core/settings";
+import { requireClaudeCommand } from "../ai/claudeCommandGuard";
 
 const DEFAULT_PROMPT_TEMPLATE = `次のタスクのうち、AIが実行可能な部分をすべて実施してください。
 
@@ -24,7 +27,13 @@ export interface AIDelegationOptions {
   app: App;
   taskFile: TFile;
   vaultRoot: string;
-  claudeCmd?: string;
+  /**
+   * Plugin settings: the log folder (running is blocked while empty) and the
+   * Claude Code command, which is only ever taken from here.
+   */
+  settings: DeckSettings;
+  /** Opens Settings → Deck (offered when logFolder is empty). */
+  openSettings?: () => void;
   /** frontmatter field for kanban status (default: "status") */
   statusField?: string;
   /** value to set when AI run succeeds (default: "レビュー待ち") */
@@ -68,7 +77,7 @@ export class AIDelegationModal extends Modal {
     warn.setText(
       "⚠️  AIにファイル編集・シェルコマンド実行を許可します。" +
         " 実行中にモーダルを閉じてもセッションは継続し、" +
-        " ログは ログ/AI移譲/<timestamp>_<task>.md にリアルタイム書き出しされます。" +
+        ` ログは ${this.opts.settings.aiLogFolder || "(未設定)"}/<timestamp>_<task>.md にリアルタイム書き出しされます。` +
         " ステータスバー右下の AI🤖 から復帰できます。"
     );
 
@@ -111,6 +120,21 @@ export class AIDelegationModal extends Modal {
       cls: "mod-cta",
     });
     this.runBtn.addEventListener("click", () => void this.run());
+
+    if (!this.opts.settings.aiLogFolder) {
+      // Without a log folder there is nowhere to record what the AI did.
+      this.runBtn.disabled = true;
+      const notice = contentEl.createDiv({ cls: "nd-empty nd-setup-notice" });
+      notice.createEl("p", { text: t().setFirstNotice(t().aiLogFolderName) });
+      const open = this.opts.openSettings;
+      if (open) {
+        const btn = notice.createEl("button", { cls: "mod-cta", text: t().openSettings });
+        btn.addEventListener("click", () => {
+          this.close();
+          open();
+        });
+      }
+    }
 
     this.statusEl = contentEl.createDiv({ cls: "nd-ai-delegate-status nd-muted" });
     this.statusEl.setText("待機中");
@@ -267,6 +291,13 @@ export class AIDelegationModal extends Modal {
       return;
     }
     const mode = this.modeSelect.value as "acceptEdits" | "bypassPermissions";
+    let claudeCmd: string;
+    try {
+      claudeCmd = requireClaudeCommand(this.opts.settings);
+    } catch (e) {
+      new Notice((e as Error).message, 10000);
+      return;
+    }
 
     this.runBtn.disabled = true;
     this.runBtn.setText("起動中…");
@@ -282,7 +313,8 @@ export class AIDelegationModal extends Modal {
         vaultRoot: this.opts.vaultRoot,
         permissionMode: mode,
         prompt,
-        claudeCmd: this.opts.claudeCmd,
+        claudeCmd,
+        logFolder: this.opts.settings.aiLogFolder,
         onFinalize: async (e, final) => {
           if (final.ok) {
             const moved = await this.advanceStatus();

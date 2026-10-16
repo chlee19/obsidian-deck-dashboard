@@ -153,3 +153,52 @@ function makeFakeEl(): any {
   };
   return el;
 }
+
+// Minimal moment stand-in: locale() drives i18n, format() is unused in tests
+// that rely on injected formatters.
+export const moment: any = Object.assign(() => ({ format: () => "" }), {
+  locale: () => "en",
+});
+
+// Behaves like Obsidian's Component for lifecycle tests: children load with
+// their parent, and unloading runs registered cleanups and unloads children.
+export class Component {
+  private _loaded = false;
+  private _children: Component[] = [];
+  private _cleanups: (() => void)[] = [];
+  load(): void {
+    if (this._loaded) return;
+    this._loaded = true;
+    this.onload();
+    for (const c of this._children) c.load();
+  }
+  unload(): void {
+    if (!this._loaded) return;
+    this._loaded = false;
+    for (const c of [...this._children]) c.unload();
+    this._children = [];
+    const cleanups = this._cleanups;
+    this._cleanups = [];
+    for (const fn of cleanups) fn();
+    this.onunload();
+  }
+  onload(): void {}
+  onunload(): void {}
+  addChild<T extends Component>(c: T): T {
+    this._children.push(c);
+    if (this._loaded) c.load();
+    return c;
+  }
+  removeChild<T extends Component>(c: T): T {
+    this._children = this._children.filter((x) => x !== c);
+    c.unload();
+    return c;
+  }
+  register(cb: () => void): void {
+    this._cleanups.push(cb);
+  }
+  registerDomEvent(el: any, type: string, cb: any, opts?: any): void {
+    el.addEventListener(type, cb, opts);
+    this.register(() => el.removeEventListener(type, cb, opts));
+  }
+}

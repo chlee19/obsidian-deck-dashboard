@@ -12,6 +12,7 @@ import { taskCreatorWidget } from "./TaskCreatorWidget";
 import { chartsWidget } from "./ChartsWidget";
 import { aiSearchWidget } from "./AISearchWidget";
 import { mailWidget } from "./MailWidget";
+import { basesWidget } from "./BasesWidget";
 
 export function registerBuiltinWidgets(): void {
   widgetRegistry.register(todayWidget);
@@ -21,6 +22,7 @@ export function registerBuiltinWidgets(): void {
   widgetRegistry.register(markdownWidget);
   widgetRegistry.register(noteEmbedWidget);
   widgetRegistry.register(dataviewWidget);
+  widgetRegistry.register(basesWidget);
   widgetRegistry.register(counterWidget);
   widgetRegistry.register(calendarWidget);
   widgetRegistry.register(googleCalendarWidget);

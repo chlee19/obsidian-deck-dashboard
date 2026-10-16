@@ -1,3 +1,4 @@
+import type { DeckSettings } from "../core/settings";
 import { App, Modal, Notice, TFile } from "obsidian";
 import {
   AISessionRegistry,
@@ -9,6 +10,9 @@ import { AIDelegationModal } from "./AIDelegationModal";
 export interface AISessionListOptions {
   app: App;
   vaultRoot: string;
+  /** Plugin settings, passed on when a session is reopened. */
+  settings: DeckSettings;
+  openSettings?: () => void;
   registry?: AISessionRegistry;
 }
 
@@ -18,7 +22,7 @@ export class AISessionListModal extends Modal {
   private vaultRoot: string;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(opts: AISessionListOptions) {
+  constructor(private readonly opts: AISessionListOptions) {
     super(opts.app);
     this.registry = opts.registry ?? getAISessionRegistry();
     this.vaultRoot = opts.vaultRoot;
@@ -111,6 +115,8 @@ export class AISessionListModal extends Modal {
       app: this.app,
       taskFile: f,
       vaultRoot: this.vaultRoot,
+      settings: this.opts.settings,
+      openSettings: this.opts.openSettings,
       registry: this.registry,
     }).open();
     this.close();

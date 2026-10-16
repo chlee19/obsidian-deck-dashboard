@@ -16,9 +16,15 @@ import {
   isSyncEnabled,
   listTaskFiles,
   readTask,
+  serializeFrontmatter,
   writeTask,
 } from "../core/taskModel";
 import type { SyncScope } from "../core/taskModel";
+import { cleanFolder, settingsOf } from "../core/settings";
+import { requireSafeVaultPath, safeFolderName, sanitizeFileTitle } from "../core/safePath";
+import { warnOnce } from "../core/claudeCommand";
+import { readPluginData, updatePluginData } from "../core/pluginData";
+import { t } from "../core/i18n";
 
 // Re-export so consumers (e.g. SyncSettingsTab) can import SyncScope from here.
 export type { SyncScope };
@@ -80,8 +86,6 @@ export type SyncConfig = ScopeConfigMap & {
   last_sync?: string;
 };
 
-const DEFAULT_SELF_OWNER = "髙木";
-
 interface PluginDataShape {
   sync_config?: SyncConfig;
 }
@@ -108,8 +112,13 @@ export class SheetsSync {
     return SheetsSync.isSyncing;
   }
 
+  /** Task folder from the plugin settings ("" while unset). */
+  private taskFolder(): string {
+    return settingsOf(this.plugin).taskFolder;
+  }
+
   async getConfig(): Promise<SyncConfig> {
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginDataShape;
+    const data = (await readPluginData(this.plugin)) as PluginDataShape;
     const raw = data.sync_config ?? {};
     // Auto-migrate legacy v1 top-level fields → personal scope
     if (raw.spreadsheetId && !raw.personal) {
@@ -123,14 +132,13 @@ export class SheetsSync {
       delete raw.last_sync;
       await this.saveConfig(raw);
     }
-    if (!raw.self_owner) raw.self_owner = DEFAULT_SELF_OWNER;
     return raw;
   }
 
   private async saveConfig(next: SyncConfig): Promise<void> {
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginDataShape;
-    data.sync_config = next;
-    await this.plugin.saveData(data);
+    await updatePluginData(this.plugin, (data) => {
+      data.sync_config = next;
+    });
   }
 
   private async updateScopeConfig(scope: SyncScope, patch: Partial<ScopeConfig>): Promise<void> {
@@ -215,10 +223,22 @@ export class SheetsSync {
       );
     }
     report.spreadsheetUrl = scopeCfg.spreadsheetUrl;
-    const selfOwner = config.self_owner ?? DEFAULT_SELF_OWNER;
+    const selfOwner = config.self_owner?.trim() ?? "";
+    // The org sheet is "everyone's folders except mine". Without knowing which
+    // folder is mine, the user's own tasks would be pushed to the shared sheet.
+    if (scope === "org" && !selfOwner) {
+      throw new Error(
+        "self_owner が未設定です。設定 → Deck で自分のフォルダ名を入れてから組織シートを同期してください。"
+      );
+    }
+
+    const taskFolder = this.taskFolder();
+    if (!taskFolder) {
+      throw new Error(t().setFirstNotice(t().taskFolderName));
+    }
 
     // 1. Backfill missing task_ids
-    const newIds = await backfillTaskIds(this.app);
+    const newIds = await backfillTaskIds(this.app, taskFolder);
     if (newIds > 0) new Notice(`task_id を ${newIds} 件付与`);
 
     // 2. Load both sides
@@ -333,13 +353,13 @@ export class SheetsSync {
   }
 
   /**
-   * Collect every task_id present anywhere under タスク/詳細/ (no scope filter).
+   * Collect every task_id present anywhere under the task folder (no scope filter).
    * Used to suppress duplicate md creation when a sheet row's task already
    * lives in a different scope's folder.
    */
   private async loadAllKnownTaskIds(): Promise<Set<string>> {
     const ids = new Set<string>();
-    for (const f of await listTaskFiles(this.app)) {
+    for (const f of await listTaskFiles(this.app, this.taskFolder())) {
       const rec = await readTask(this.app, f);
       const id = rec.frontmatter.task_id;
       if (typeof id === "string" && id.length > 0) ids.add(id);
@@ -348,7 +368,13 @@ export class SheetsSync {
   }
 
   private async loadVaultTasks(scope: SyncScope, selfOwner: string): Promise<TaskRecord[]> {
-    const files = filterByScope(await listTaskFiles(this.app), scope, selfOwner);
+    const taskFolder = this.taskFolder();
+    const files = filterByScope(
+      await listTaskFiles(this.app, taskFolder),
+      scope,
+      selfOwner,
+      taskFolder
+    );
     const out: TaskRecord[] = [];
     for (const f of files) {
       const rec = await readTask(this.app, f);
@@ -364,54 +390,35 @@ export class SheetsSync {
     scope: SyncScope,
     selfOwner: string
   ): Promise<TFile> {
-    const title = String(values[COL.title] ?? "").trim();
-    if (!title) throw new Error("タイトルが空");
-    const id = String(values[COL.task_id] ?? "").trim() || generateTaskId();
-    // Owner resolution:
-    // - explicit 担当 cell wins
-    // - else personal scope falls back to selfOwner
-    // - else org scope routes to 未割当 (never flat root — protects user's
-    //   fine-grained personal tasks from being polluted by sheet-side rows)
-    const owner =
-      cellStr(values[COL.担当]) ||
-      (scope === "personal" ? selfOwner : "未割当");
-    const fm: TaskFrontmatter = {
-      task_id: id,
-      PJT: cellStr(values[COL.PJT]),
-      期限: cellStr(values[COL.期限]),
-      優先度: cellStr(values[COL.優先度]),
-      ラベル: cellStr(values[COL.ラベル]),
-      status: cellStr(values[COL.status]) || "着手前",
-      工数: cellStr(values[COL.工数]),
-      depends: cellStr(values[COL.depends]) || "なし",
-      担当: owner,
-      依頼者: cellStr(values[COL.依頼者]),
-      sync_meta: { last_sync: now, origin: "sheets" },
-    };
-    const fmText = Object.entries(fm)
-      .filter(([k, v]) => v !== undefined && v !== "" && k !== "sync_meta")
-      .map(([k, v]) => `${k}: ${cellStr(v)}`)
-      .join("\n");
-    const body = `# ${title}\n\nSheets発のタスク。詳細はSheets側を参照。\n`;
-    const safeTitle = title.replace(/[/\\:]/g, "_");
-    const folder = `タスク/詳細/${owner}`;
-    const existing = this.app.vault.getAbstractFileByPath(folder);
-    if (!existing) await this.app.vault.createFolder(folder);
-    const path = `${folder}/${safeTitle}.md`;
-    const fullText = `---\n${fmText}\nsync_meta:\n  last_sync: ${now}\n  origin: sheets\n---\n${body}`;
-    return await this.app.vault.create(path, fullText);
+    const taskFolder = this.taskFolder();
+    const plan = planSheetTask(values, now, scope, selfOwner, taskFolder);
+    if (plan.rejectedOwner !== null && warnOnce(rejectedOwners, plan.rejectedOwner)) {
+      new Notice(
+        `担当「${plan.rejectedOwner.replace(/\s+/g, " ")}」はフォルダ名として使えないため、未割当に入れました。`,
+        10000
+      );
+    }
+    const folder = requireSafeVaultPath(plan.folder, taskFolder);
+    let acc = "";
+    for (const part of folder.split("/")) {
+      acc = acc ? `${acc}/${part}` : part;
+      if (!this.app.vault.getAbstractFileByPath(acc)) await this.app.vault.createFolder(acc);
+    }
+    return await this.app.vault.create(requireSafeVaultPath(plan.path, folder), plan.content);
   }
 
   private async appendLog(scope: SyncScope, report: SyncReport, now: string): Promise<void> {
     const date = now.slice(0, 10);
-    const dir = "ログ/sync";
+    const configured = settingsOf(this.plugin).syncLogFolder;
+    if (!configured) return; // no log folder configured → keep no log
+    const dir = requireSafeVaultPath(configured, "");
     try {
       const folder = this.app.vault.getAbstractFileByPath(dir);
       if (!folder) await this.app.vault.createFolder(dir);
     } catch {
       /* ignore */
     }
-    const path = `${dir}/${date}.jsonl`;
+    const path = requireSafeVaultPath(`${dir}/${date}.jsonl`, dir);
     const line =
       JSON.stringify({
         ts: now,
@@ -469,6 +476,71 @@ interface MergeResult {
  *   → take vault value, write to sheet
  * - Conflict detection: when both sides changed since last_sync, log it but apply ownership.
  */
+/** Owner values already reported as unusable this session. */
+const rejectedOwners = new Set<string>();
+
+const UNASSIGNED = "未割当";
+
+export interface SheetTaskPlan {
+  folder: string;
+  path: string;
+  content: string;
+  /** The 担当 cell when it was not usable as a folder name. */
+  rejectedOwner: string | null;
+}
+
+/**
+ * Where and what to write for a sheet row that has no note yet. Sheet cells
+ * are edited by other people, so the owner must be exactly one safe folder
+ * name (otherwise the note goes to 未割当), the title becomes a plain file
+ * name, and every value is written as a single-line YAML scalar.
+ */
+function planSheetTask(
+  values: string[],
+  now: string,
+  scope: SyncScope,
+  selfOwner: string,
+  taskFolder: string
+): SheetTaskPlan {
+  const title = String(values[COL.title] ?? "").trim();
+  if (!title) throw new Error("タイトルが空");
+  const id = String(values[COL.task_id] ?? "").trim() || generateTaskId();
+  // Owner resolution:
+  // - explicit 担当 cell wins (when it is a usable folder name)
+  // - else personal scope falls back to selfOwner
+  // - else org scope routes to 未割当 (never flat root — protects user's
+  //   fine-grained personal tasks from being polluted by sheet-side rows)
+  const ownerCell = cellStr(values[COL.担当]);
+  const ownerFolder = ownerCell ? safeFolderName(ownerCell) : null;
+  const rejectedOwner = ownerCell && !ownerFolder ? ownerCell : null;
+  const fallback = scope === "personal" ? safeFolderName(selfOwner) ?? UNASSIGNED : UNASSIGNED;
+  const owner = ownerFolder ?? (rejectedOwner ? UNASSIGNED : fallback);
+  const fm: TaskFrontmatter = {
+    task_id: id,
+    PJT: cellStr(values[COL.PJT]),
+    期限: cellStr(values[COL.期限]),
+    優先度: cellStr(values[COL.優先度]),
+    ラベル: cellStr(values[COL.ラベル]),
+    status: cellStr(values[COL.status]) || "着手前",
+    工数: cellStr(values[COL.工数]),
+    depends: cellStr(values[COL.depends]) || "なし",
+    担当: ownerCell || owner,
+    依頼者: cellStr(values[COL.依頼者]),
+  };
+  for (const k of Object.keys(fm)) if (fm[k] === "") delete fm[k];
+  fm.sync_meta = { last_sync: now, origin: "sheets" };
+  const fileTitle = sanitizeFileTitle(title);
+  const folder = `${cleanFolder(taskFolder)}/${owner}`;
+  const heading = title.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
+  const body = `# ${heading}\n\nSheets発のタスク。詳細はSheets側を参照。\n`;
+  return {
+    folder,
+    path: `${folder}/${fileTitle}.md`,
+    content: `---\n${serializeFrontmatter(fm)}---\n${body}`,
+    rejectedOwner,
+  };
+}
+
 function mergeBoth(
   vault: TaskRecord,
   sheetRow: string[],
@@ -570,6 +642,7 @@ function rowEquivalent(current: string[], candidate: (string | null)[]): boolean
 // Re-exports for tests
 export const __test = {
   mergeBoth,
+  planSheetTask,
   buildRowFromVault,
   fmEquivalent,
   rowEquivalent,

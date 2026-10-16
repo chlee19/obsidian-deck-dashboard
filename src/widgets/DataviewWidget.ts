@@ -2,6 +2,8 @@ import { Setting } from "obsidian";
 import type { WidgetDefinition } from "./types";
 import { getDataviewApi } from "../adapters/dataview";
 import { wireInternalLinks } from "./linkHandler";
+import { renderTokenNotice } from "./tokenNotice";
+import { expandFolderTokens } from "../core/pathTokens";
 
 interface Settings {
   query: string;
@@ -13,7 +15,7 @@ export const dataviewWidget: WidgetDefinition<Settings> = {
   label: "Dataview Query",
   description: "Dataviewの DQL クエリを実行して結果を表示する。",
   defaultSettings: () => ({
-    query: "TABLE file.mtime AS \"更新\" FROM \"日報\" SORT file.mtime DESC LIMIT 5",
+    query: 'TABLE file.mtime AS "Updated" SORT file.mtime DESC LIMIT 5',
     mode: "dql",
   }),
   async render(el, settings, ctx) {
@@ -24,11 +26,16 @@ export const dataviewWidget: WidgetDefinition<Settings> = {
       el.createEl("p", { cls: "nd-empty", text: "Dataview プラグインが必要です。" });
       return;
     }
+    const expanded = expandFolderTokens(settings.query, ctx.settings);
+    if (!expanded.ok) {
+      renderTokenNotice(el, ctx, expanded.missing);
+      return;
+    }
     try {
       if (settings.mode === "dql") {
-        await dv.execute(settings.query, el, ctx.parent, ctx.sourcePath);
+        await dv.execute(expanded.query, el, ctx.parent, ctx.sourcePath);
       } else {
-        await dv.executeJs(settings.query, el, ctx.parent, ctx.sourcePath);
+        await dv.executeJs(expanded.query, el, ctx.parent, ctx.sourcePath);
       }
       wireInternalLinks(el, ctx.app, ctx.sourcePath);
     } catch (e) {
@@ -49,7 +56,7 @@ export const dataviewWidget: WidgetDefinition<Settings> = {
       );
     new Setting(container)
       .setName("クエリ")
-      .setDesc("Dataview の DQL or JS")
+      .setDesc("Dataview の DQL or JS。{{taskFolder}} / {{meetingFolder}} / {{dailyFolder}} は 設定 → Deck のフォルダに置き換わります")
       .addTextArea((t) => {
         t.setValue(settings.query);
         t.inputEl.rows = 8;

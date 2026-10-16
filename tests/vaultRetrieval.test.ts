@@ -12,7 +12,7 @@ describe("tokenize", () => {
 
 describe("scoreFilename", () => {
   it("パスにトークンが含まれると加点", () => {
-    expect(scoreFilename("議事録/サンプル.md", ["サンプル"])).toBe(1);
+    expect(scoreFilename("Notes/サンプル.md", ["サンプル"])).toBe(1);
     expect(scoreFilename("other.md", ["サンプル"])).toBe(0);
   });
 });

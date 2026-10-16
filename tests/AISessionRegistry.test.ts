@@ -4,6 +4,7 @@ import {
   getAISessionRegistry,
 } from "../src/core/AISessionRegistry";
 import type { StreamEvent } from "../src/adapters/claudeCodeStream";
+import { runClaudeStream } from "../src/adapters/claudeCodeStream";
 
 // Mock the heavy adapters used by start() so the test stays hermetic.
 vi.mock("../src/adapters/claudeCodeStream", () => {
@@ -38,7 +39,7 @@ vi.mock("../src/adapters/aiLogWriter", () => {
   return {
     AILogWriter: {
       create: vi.fn(async (_app: any, basename: string) => ({
-        path: `ログ/AI移譲/test_${basename}.md`,
+        path: `Logs/AI/test_${basename}.md`,
         init: vi.fn(async () => undefined),
         logEvent: vi.fn(async () => undefined),
         finalize: vi.fn(async () => undefined),
@@ -91,6 +92,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "do thing",
     });
@@ -109,6 +112,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -131,6 +136,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -154,6 +161,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
       onFinalize,
@@ -182,6 +191,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -198,6 +209,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -206,6 +219,8 @@ describe("AISessionRegistry", () => {
         app,
         taskFile: file,
         vaultRoot: "/tmp/vault",
+        logFolder: "Logs/AI",
+        claudeCmd: "/opt/tools/claude",
         permissionMode: "acceptEdits",
         prompt: "p",
       })
@@ -219,6 +234,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -240,6 +257,8 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -249,5 +268,22 @@ describe("AISessionRegistry", () => {
 
   it("getAISessionRegistry() returns the same singleton instance", () => {
     expect(getAISessionRegistry()).toBe(getAISessionRegistry());
+  });
+});
+
+describe("AISessionRegistry command", () => {
+  it("runs exactly the command it was given (from Settings → Deck)", async () => {
+    const reg = new AISessionRegistry();
+    await reg.start({
+      app: makeApp(),
+      taskFile: makeTaskFile(),
+      vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
+      claudeCmd: "/opt/tools/claude",
+      permissionMode: "acceptEdits",
+      prompt: "do thing",
+    });
+    const calls = (runClaudeStream as unknown as { mock: { calls: { claudeCmd: string }[][] } }).mock.calls;
+    expect(calls[calls.length - 1][0].claudeCmd).toBe("/opt/tools/claude");
   });
 });

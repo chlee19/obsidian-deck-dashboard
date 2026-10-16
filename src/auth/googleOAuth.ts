@@ -1,4 +1,5 @@
 import { Notice, Platform, Plugin, requestUrl } from "obsidian";
+import { SecretStore } from "../core/secrets";
 
 export interface OAuthCredentials {
   client_id: string;
@@ -10,11 +11,6 @@ export interface StoredTokens {
   refresh_token: string;
   expires_at: number;
   scope: string;
-}
-
-interface PluginData {
-  google_credentials?: OAuthCredentials;
-  google_tokens?: StoredTokens;
 }
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -35,34 +31,32 @@ export function hasScope(stored: StoredTokens | null, requiredScope: string): bo
 export const REQUIRED_SCOPES = SCOPES;
 
 export class GoogleOAuth {
-  constructor(private plugin: Plugin) {}
+  // Client secret and tokens go to Obsidian's secret storage when available
+  // (see SecretStore); older Obsidian versions keep them in data.json.
+  private readonly secrets: SecretStore;
+
+  constructor(private plugin: Plugin) {
+    this.secrets = new SecretStore(plugin);
+  }
 
   async getCredentials(): Promise<OAuthCredentials | null> {
-    const data = (await this.plugin.loadData()) as PluginData | null;
-    return data?.google_credentials ?? null;
+    return await this.secrets.get<OAuthCredentials>("google_credentials");
   }
 
   async setCredentials(creds: OAuthCredentials): Promise<void> {
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginData;
-    data.google_credentials = creds;
-    await this.plugin.saveData(data);
+    await this.secrets.set("google_credentials", creds);
   }
 
   async getTokens(): Promise<StoredTokens | null> {
-    const data = (await this.plugin.loadData()) as PluginData | null;
-    return data?.google_tokens ?? null;
+    return await this.secrets.get<StoredTokens>("google_tokens");
   }
 
   async setTokens(tokens: StoredTokens): Promise<void> {
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginData;
-    data.google_tokens = tokens;
-    await this.plugin.saveData(data);
+    await this.secrets.set("google_tokens", tokens);
   }
 
   async clearTokens(): Promise<void> {
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginData;
-    delete data.google_tokens;
-    await this.plugin.saveData(data);
+    await this.secrets.set("google_tokens", null);
   }
 
   async isAuthenticated(): Promise<boolean> {

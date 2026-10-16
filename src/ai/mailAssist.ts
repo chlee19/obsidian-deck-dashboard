@@ -1,7 +1,10 @@
 import type { App, Plugin } from "obsidian";
 import { chat } from "../adapters/anthropic";
 import { runClaudeP } from "../adapters/claudeCode";
-import { selectCandidates, DEFAULT_EXCLUDES, type Candidate } from "../core/vaultRetrieval";
+import { selectCandidates, type Candidate } from "../core/vaultRetrieval";
+import { searchExcludes, settingsOf } from "../core/settings";
+import { SecretStore } from "../core/secrets";
+import { requireClaudeCommand } from "./claudeCommandGuard";
 import type { GmailThread } from "../adapters/gmail";
 import type { MailConfig } from "../core/mailConfig";
 
@@ -73,17 +76,17 @@ export async function generateReplyDraft(
     topK: 8,
     excerptChars: 400,
     folders: config.ragFolders,
-    excludeFolders: DEFAULT_EXCLUDES,
+    excludeFolders: searchExcludes(settingsOf(plugin)),
   });
   const prompt = buildPrompt(thread, candidates);
 
   let raw: string;
   if (config.backend === "claude-code") {
-    raw = (await runClaudeP(prompt, config.claudeCmd)).text;
+    raw = (await runClaudeP(prompt, requireClaudeCommand(settingsOf(plugin)))).text;
   } else {
-    const data = ((await plugin.loadData()) ?? {}) as { anthropic_api_key?: string };
-    if (!data.anthropic_api_key) throw new Error("Anthropic API キーが未設定です（設定で backend を claude-code にするか、キーを設定）");
-    raw = (await chat(data.anthropic_api_key, config.model, "", [{ role: "user", content: prompt }], 1500)).text;
+    const apiKey = await new SecretStore(plugin).get<string>("anthropic_api_key");
+    if (!apiKey) throw new Error("Anthropic API キーが未設定です（設定で backend を claude-code にするか、キーを設定）");
+    raw = (await chat(apiKey, config.model, "", [{ role: "user", content: prompt }], 1500)).text;
   }
   const { summary, replyDraft } = parseAssistOutput(raw);
   return { summary, replyDraft, sources: candidates.map((c) => c.path) };

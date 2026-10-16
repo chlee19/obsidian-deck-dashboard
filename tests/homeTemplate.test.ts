@@ -10,6 +10,7 @@ import {
 } from "../src/core/DashboardModel";
 import { CURRENT_SCHEMA_VERSION } from "../src/core/constants";
 import type { Dashboard } from "../src/core/types";
+import { getStrings } from "../src/core/i18n";
 
 describe("homeTemplate", () => {
   afterEach(() => {
@@ -19,7 +20,7 @@ describe("homeTemplate", () => {
   it("returns a dashboard at the current schema version", () => {
     const tpl = getHomeTemplate();
     expect(tpl.version).toBe(CURRENT_SCHEMA_VERSION);
-    expect(tpl.title).toBe("ホーム");
+    expect(tpl.title).toBe("Home");
   });
 
   it("round-trips through serialize/parse without loss", () => {
@@ -48,14 +49,14 @@ describe("homeTemplate", () => {
     a.title = "Mutated";
     a.layout.push({ i: "extra", x: 0, y: 99, w: 1, h: 1 });
     const b = getHomeTemplate();
-    expect(b.title).toBe("ホーム");
+    expect(b.title).toBe("Home");
     expect(b.layout.find((l) => l.i === "extra")).toBeUndefined();
   });
 
   it("honors title override without leaking it back into the stock template", () => {
     const renamed = getHomeTemplate("マイホーム");
     expect(renamed.title).toBe("マイホーム");
-    expect(getHomeTemplate().title).toBe("ホーム");
+    expect(getHomeTemplate().title).toBe("Home");
   });
 
   it("setHomeTemplate replaces the active template until cleared", () => {
@@ -71,7 +72,7 @@ describe("homeTemplate", () => {
     expect(getHomeTemplate().title).toBe("Custom");
     expect(getHomeTemplate().layout).toHaveLength(1);
     setHomeTemplate(null);
-    expect(getHomeTemplate().title).toBe("ホーム");
+    expect(getHomeTemplate().title).toBe("Home");
   });
 
   it("getStockHomeTemplate ignores any override", () => {
@@ -81,7 +82,7 @@ describe("homeTemplate", () => {
       layout: [],
       widgets: {},
     });
-    expect(getStockHomeTemplate().title).toBe("ホーム");
+    expect(getStockHomeTemplate().title).toBe("Home");
   });
 
   it("references only widget types that are bundled with the plugin", () => {
@@ -103,6 +104,25 @@ describe("homeTemplate", () => {
     const tpl = getHomeTemplate();
     for (const [id, w] of Object.entries(tpl.widgets)) {
       expect(allowed.has(w.type), `widget ${id} has unknown type ${w.type}`).toBe(true);
+    }
+  });
+});
+
+describe("homeTemplate language", () => {
+  it("uses Japanese titles for Japanese users", () => {
+    const tpl = getHomeTemplate(undefined, getStrings("ja"));
+    expect(tpl.title).toBe("ホーム");
+    expect(tpl.widgets.today.title).toBe("今日");
+  });
+});
+
+describe("homeTemplate privacy", () => {
+  it("does not link to notes that only exist in one particular vault", () => {
+    const tpl = getHomeTemplate();
+    for (const [id, w] of Object.entries(tpl.widgets)) {
+      const content = (w.settings as { content?: unknown }).content;
+      if (typeof content !== "string") continue;
+      expect(content, `widget ${id} links to a vault-specific note`).not.toMatch(/\[\[/);
     }
   });
 });

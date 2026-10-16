@@ -4,7 +4,12 @@ import type { WidgetDefinition } from "./types";
 import { chat } from "../adapters/anthropic";
 import { runClaudeP } from "../adapters/claudeCode";
 import { wireInternalLinks } from "./linkHandler";
-import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED, DEFAULT_EXCLUDES } from "../core/vaultRetrieval";
+import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED } from "../core/vaultRetrieval";
+import { searchExcludes } from "../core/settings";
+import { SecretStore } from "../core/secrets";
+import { requireWidgetClaudeCommand } from "../ai/claudeCommandGuard";
+import { requireSafeVaultPath, sanitizeFileTitle } from "../core/safePath";
+import { t } from "../core/i18n";
 
 type Backend = "claude-code" | "api";
 
@@ -80,18 +85,18 @@ function promptText(
 
 interface Settings {
   backend: Backend;
-  claudeCmd: string;
+  /**
+   * Written by 0.0.x. Never run: the command comes from Settings → Deck only.
+   * Kept in the type so a differing value can be reported to the user.
+   */
+  claudeCmd?: string;
   model: string;
   topK: number;
   excerptChars: number;
   folders: string[]; // empty = whole vault (minus excludes)
-  excludeFolders: string[]; // always skipped, even when folders is empty
+  excludeFolders: string[]; // skipped on top of Settings → Deck's exclude list
 }
 
-
-interface PluginData {
-  anthropic_api_key?: string;
-}
 
 export const aiSearchWidget: WidgetDefinition<Settings> = {
   type: "ai-search",
@@ -100,21 +105,21 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
     "自然言語クエリ → vault内候補をkeyword pre-filter → Claudeに渡して関連ノートを要約付きで返す。",
   defaultSettings: () => ({
     backend: "claude-code",
-    claudeCmd: "claude",
     model: "claude-haiku-4-5-20251001",
     topK: 30,
     excerptChars: 300,
     folders: [],
-    excludeFolders: [...DEFAULT_EXCLUDES],
+    excludeFolders: [],
   }),
   async render(el, settings, ctx) {
     el.empty();
     el.addClass("nd-widget-ai-search");
 
-    const data = ((await ctx.plugin.loadData()) ?? {}) as PluginData;
+    const secrets = new SecretStore(ctx.plugin);
+    const apiKey = settings.backend === "api" ? await secrets.get<string>("anthropic_api_key") : null;
 
     // API backend requires API key. claude-code backend doesn't.
-    if (settings.backend === "api" && !data.anthropic_api_key) {
+    if (settings.backend === "api" && !apiKey) {
       const empty = el.createDiv({ cls: "nd-empty" });
       empty.createEl("p", { text: "Anthropic API キーが未設定です (API backend用)。" });
       const btn = empty.createEl("button", { text: "🔑 APIキーを設定", cls: "mod-cta" });
@@ -127,9 +132,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
             ""
           );
           if (!key) return;
-          const next = ((await ctx.plugin.loadData()) ?? {}) as PluginData;
-          next.anthropic_api_key = key.trim();
-          await ctx.plugin.saveData(next);
+          await secrets.set("anthropic_api_key", key.trim());
           new Notice("APIキーを保存しました");
           void aiSearchWidget.render(el, settings, ctx);
         })();
@@ -169,7 +172,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
         topK: settings.topK,
         excerptChars: settings.excerptChars,
         folders: settings.folders,
-        excludeFolders: settings.excludeFolders ?? DEFAULT_EXCLUDES,
+        excludeFolders: searchExcludes(ctx.settings, settings.excludeFolders ?? []),
       });
       meta.setText(`候補 ${candidates.length} 件 / Claude 問い合わせ中…`);
 
@@ -196,16 +199,14 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
           // claude -p reads prompt from stdin; combine system+user
           const merged = `${system}\n\n---\n\n${user}`;
           const t0 = Date.now();
-          const cc = await runClaudeP(merged, settings.claudeCmd);
+          const cmd = requireWidgetClaudeCommand(settings, ctx.settings);
+          const cc = await runClaudeP(merged, cmd);
           answerMd = cc.text.trim();
           const ms = Date.now() - t0;
-          meta.setText(
-            `候補 ${candidates.length} 件 / claude -p (${settings.claudeCmd}) / ${ms}ms`
-          );
+          meta.setText(`候補 ${candidates.length} 件 / claude -p (${cmd}) / ${ms}ms`);
         } else {
-          const apiKey = data.anthropic_api_key as string;
           const res = await chat(
-            apiKey,
+            apiKey ?? "",
             settings.model,
             system,
             [{ role: "user", content: user }],
@@ -244,7 +245,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
 
       try {
         const t0 = Date.now();
-        const cc = await runClaudeP(webPrompt, settings.claudeCmd);
+        const cc = await runClaudeP(webPrompt, requireWidgetClaudeCommand(settings, ctx.settings));
         const webMd = cc.text.trim();
         const ms = Date.now() - t0;
         meta.setText(`🌐 Web検索完了 / claude -p (WebSearch) / ${ms}ms`);
@@ -272,8 +273,19 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       const d = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
       const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      const slug = query.replace(/[\\/:*?"<>|\n\r\t]+/g, "_").slice(0, 50).trim() || "memo";
-      const folder = "inbox/temp";
+      const slug = sanitizeFileTitle(query).slice(0, 50).trim() || "memo";
+      if (!ctx.settings.aiNotesFolder) {
+        new Notice(t().setFirstNotice(t().aiNotesFolderName));
+        ctx.openSettings();
+        return;
+      }
+      let folder: string;
+      try {
+        folder = requireSafeVaultPath(ctx.settings.aiNotesFolder, "");
+      } catch (e) {
+        new Notice((e as Error).message, 8000);
+        return;
+      }
       if (!ctx.app.vault.getAbstractFileByPath(folder)) {
         try {
           await ctx.app.vault.createFolder(folder);
@@ -281,7 +293,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
           /* ignore */
         }
       }
-      let path = `${folder}/${ymd}_${slug}.md`;
+      let path = requireSafeVaultPath(`${folder}/${ymd}_${slug}.md`, folder);
       let i = 2;
       while (ctx.app.vault.getAbstractFileByPath(path)) {
         path = `${folder}/${ymd}_${slug}_${i}.md`;
@@ -324,7 +336,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       }
 
       const saveBtn = actions.createEl("button", {
-        text: "📚 ナレッジ化 (inbox/temp)",
+        text: ctx.settings.aiNotesFolder ? `📚 ナレッジ化 (${ctx.settings.aiNotesFolder})` : "📚 ナレッジ化",
         cls: isWebResult ? "mod-cta" : "",
       });
       saveBtn.addEventListener("click", () =>
@@ -345,10 +357,8 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       e.stopImmediatePropagation();
       void submit();
     };
-    activeDocument.addEventListener("keydown", cmdEnterHandler, true);
-    ctx.parent.register(() => {
-      activeDocument.removeEventListener("keydown", cmdEnterHandler, true);
-    });
+    // ctx.parent is unloaded before the next render, which removes this.
+    ctx.parent.registerDomEvent(activeDocument, "keydown", cmdEnterHandler, { capture: true });
     // Fallback for environments where document-capture is unreachable.
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -367,21 +377,13 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
   renderSettingsForm(container, settings, onChange) {
     new Setting(container)
       .setName("バックエンド")
-      .setDesc("claude-code = `claude -p` 経由 (Pro/Maxサブスク・APIキー不要・desktop限定) / api = Anthropic API 直叩き")
+      .setDesc("claude-code = `claude -p` 経由 (Pro/Maxサブスク・APIキー不要・desktop限定。コマンドは 設定 → Deck で指定) / api = Anthropic API 直叩き")
       .addDropdown((d) =>
         d
           .addOption("claude-code", "claude -p (subscription)")
           .addOption("api", "Anthropic API (key)")
           .setValue(settings.backend)
           .onChange((v) => onChange({ ...settings, backend: v as Backend }))
-      );
-    new Setting(container)
-      .setName("claude コマンド (claude-code backend用)")
-      .setDesc('PATHに通ってる名前 or 絶対パス。デフォルト "claude"')
-      .addText((t) =>
-        t.setValue(settings.claudeCmd).onChange((v) =>
-          onChange({ ...settings, claudeCmd: v.trim() || "claude" })
-        )
       );
     new Setting(container)
       .setName("モデル (api backendのみ)")
@@ -407,7 +409,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       );
     new Setting(container)
       .setName("検索対象フォルダ (カンマ区切り)")
-      .setDesc("空 = vault全体（除外フォルダを除く）。例: 議事録, ナレッジ, 日報")
+      .setDesc("空 = vault全体（除外フォルダを除く）。例: Meetings, Notes")
       .addText((t) => {
         t.setValue(settings.folders.join(", "));
         t.inputEl.addClass("deck-input-full");
@@ -421,11 +423,11 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
     new Setting(container)
       .setName("除外フォルダ (カンマ区切り)")
       .setDesc(
-        `常に検索対象から外す。デフォルト: ${DEFAULT_EXCLUDES.join(", ")}。` +
+        "設定 → Deck の除外フォルダに加えて、検索対象から外す。" +
         `${ALWAYS_EXCLUDED.join(", ")} は強制除外`
       )
       .addText((t) => {
-        t.setValue((settings.excludeFolders ?? DEFAULT_EXCLUDES).join(", "));
+        t.setValue((settings.excludeFolders ?? []).join(", "));
         t.inputEl.addClass("deck-input-full");
         t.onChange((v) =>
           onChange({

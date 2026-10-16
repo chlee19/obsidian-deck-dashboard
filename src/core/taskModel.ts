@@ -1,4 +1,6 @@
 import { App, TFile } from "obsidian";
+import { cleanFolder } from "./settings";
+import { formatYamlScalar, parseYamlScalar } from "./yamlScalar";
 
 export interface TaskFrontmatter {
   task_id?: string;
@@ -30,27 +32,34 @@ export interface TaskRecord {
   lastModified: number;
 }
 
-export const TASK_DIR = "タスク/詳細";
 const FM_RE = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
 
 export type SyncScope = "personal" | "org";
 
-/**
- * List all task detail files in タスク/詳細/ (recursive, all subfolders).
- */
-export async function listTaskFiles(app: App): Promise<TFile[]> {
-  const all = app.vault.getMarkdownFiles();
-  return all.filter((f) => f.path.startsWith(TASK_DIR + "/"));
+function folderPrefix(taskFolder: string): string {
+  const f = cleanFolder(taskFolder);
+  return f ? f + "/" : "";
 }
 
 /**
- * Return the owner segment for a task file path.
- * - `タスク/詳細/foo.md` (flat) → null (defaults to "self")
- * - `タスク/詳細/高木悠人/foo.md` → "高木悠人"
- * - `タスク/詳細/嵯峨/foo.md` → "嵯峨"
+ * List all task detail files under the task folder (recursive). Empty while
+ * the task folder is not configured.
  */
-export function ownerFromPath(path: string): string | null {
-  const stripped = path.startsWith(TASK_DIR + "/") ? path.slice(TASK_DIR.length + 1) : path;
+export async function listTaskFiles(app: App, taskFolder: string): Promise<TFile[]> {
+  const prefix = folderPrefix(taskFolder);
+  if (!prefix) return [];
+  const all = app.vault.getMarkdownFiles();
+  return all.filter((f) => f.path.startsWith(prefix));
+}
+
+/**
+ * Return the owner segment for a task file path, relative to the task folder.
+ * - `Tasks/foo.md` (flat) → null (defaults to "self")
+ * - `Tasks/alice/foo.md` → "alice"
+ */
+export function ownerFromPath(path: string, taskFolder: string): string | null {
+  const prefix = folderPrefix(taskFolder);
+  const stripped = prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path;
   const parts = stripped.split("/");
   if (parts.length < 2) return null; // flat file
   return parts[0];
@@ -69,16 +78,17 @@ export function ownerFromPath(path: string): string | null {
 export function filterByScope(
   files: TFile[],
   scope: SyncScope,
-  selfOwner: string
+  selfOwner: string,
+  taskFolder: string
 ): TFile[] {
   if (scope === "org") {
     return files.filter((f) => {
-      const owner = ownerFromPath(f.path);
+      const owner = ownerFromPath(f.path, taskFolder);
       return owner !== null && owner !== selfOwner;
     });
   }
   return files.filter((f) => {
-    const owner = ownerFromPath(f.path);
+    const owner = ownerFromPath(f.path, taskFolder);
     return owner === null || owner === selfOwner;
   });
 }
@@ -138,7 +148,7 @@ export function parseFrontmatter(raw: string): TaskFrontmatter {
       continue;
     }
     const key = m[1].trim();
-    const value = m[2].trim();
+    const value = parseYamlScalar(m[2]);
     if (key === "sync_meta" && value === "") {
       // Nested block: read indented children
       const meta: NonNullable<TaskFrontmatter["sync_meta"]> = {};
@@ -147,7 +157,7 @@ export function parseFrontmatter(raw: string): TaskFrontmatter {
         const child = /^\s+([^:]+):\s*(.*)$/.exec(lines[i]);
         if (child) {
           const ck = child[1].trim();
-          const cv = child[2].trim();
+          const cv = parseYamlScalar(child[2]);
           if (ck === "sheet_row") meta.sheet_row = Number(cv) || undefined;
           else if (ck === "last_sync") meta.last_sync = cv || undefined;
           else if (ck === "origin")
@@ -186,27 +196,34 @@ export function serializeFrontmatter(fm: TaskFrontmatter): string {
   for (const k of keys) {
     const val = scalarToString(fm[k]);
     if (val === null) continue;
-    lines.push(`${k}: ${val}`);
+    lines.push(`${k}: ${formatYamlScalar(val)}`);
   }
   // Preserve unknown keys in stable order
   const knownKeys = new Set<string>(keys as string[]);
   for (const k of Object.keys(fm)) {
     if (knownKeys.has(k)) continue;
     if (k === "sync_meta") continue;
+    if (!isSafeKey(k)) continue;
     const val = scalarToString(fm[k]);
     if (val === null) continue;
-    lines.push(`${k}: ${val}`);
+    lines.push(`${k}: ${formatYamlScalar(val)}`);
   }
   if (fm.sync_meta) {
     lines.push("sync_meta:");
     if (fm.sync_meta.sheet_row !== undefined)
       lines.push(`  sheet_row: ${fm.sync_meta.sheet_row}`);
     if (fm.sync_meta.last_sync !== undefined)
-      lines.push(`  last_sync: ${fm.sync_meta.last_sync}`);
+      lines.push(`  last_sync: ${formatYamlScalar(fm.sync_meta.last_sync)}`);
     if (fm.sync_meta.origin !== undefined)
       lines.push(`  origin: ${fm.sync_meta.origin}`);
   }
   return lines.join("\n") + "\n";
+}
+
+/** A key that fits on one `key: value` line. */
+function isSafeKey(k: string): boolean {
+  // eslint-disable-next-line no-control-regex -- matching control characters is the point
+  return k.trim() !== "" && !/[\u0000-\u001f\u007f:]/.test(k);
 }
 
 /**
@@ -244,8 +261,8 @@ export function isSyncEnabled(fm: TaskFrontmatter): boolean {
 /**
  * Ensure every task md has a task_id. Returns count of newly assigned ids.
  */
-export async function backfillTaskIds(app: App): Promise<number> {
-  const files = await listTaskFiles(app);
+export async function backfillTaskIds(app: App, taskFolder: string): Promise<number> {
+  const files = await listTaskFiles(app, taskFolder);
   let count = 0;
   for (const f of files) {
     const rec = await readTask(app, f);

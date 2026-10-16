@@ -14,7 +14,6 @@ export interface RetrievalOptions {
 }
 
 export const ALWAYS_EXCLUDED = [".trash", ".claude", "node_modules"];
-export const DEFAULT_EXCLUDES = ["ログ", "アーカイブ", "添付", "inbox/temp"];
 
 export async function selectCandidates(
   app: App,
@@ -27,7 +26,7 @@ export async function selectCandidates(
   const excludes = [
     app.vault.configDir,
     ...ALWAYS_EXCLUDED,
-    ...(opts.excludeFolders ?? DEFAULT_EXCLUDES),
+    ...(opts.excludeFolders ?? []),
   ];
   const filtered = files.filter((f) => {
     if (excludes.some((ex) => f.path === ex || f.path.startsWith(ex + "/"))) return false;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { __test } from "../src/sync/sheetsSync";
+import { SheetsSync, __test } from "../src/sync/sheetsSync";
 
-const { mergeBoth, COL, HEADER_ROW, fmEquivalent, rowEquivalent } = __test;
+const { mergeBoth, COL, HEADER_ROW, fmEquivalent, rowEquivalent, planSheetTask } = __test;
 
 describe("HEADER_ROW", () => {
   it("has 14 columns matching the design", () => {
@@ -17,8 +17,8 @@ function makeSheetRow(overrides: Partial<Record<string, string>> = {}): string[]
   const row = new Array(14).fill("");
   row[COL.task_id] = overrides.task_id ?? "t-1";
   row[COL.title] = overrides.title ?? "テストタスク";
-  row[COL.PJT] = overrides.PJT ?? "やっちゃば";
-  row[COL.担当] = overrides.担当 ?? "高木";
+  row[COL.PJT] = overrides.PJT ?? "サンプルPJT";
+  row[COL.担当] = overrides.担当 ?? "山田";
   row[COL.依頼者] = overrides.依頼者 ?? "";
   row[COL.期限] = overrides.期限 ?? "2026-06-15";
   row[COL.優先度] = overrides.優先度 ?? "High";
@@ -42,14 +42,14 @@ describe("mergeBoth column ownership", () => {
     lastModified: 0,
     frontmatter: {
       task_id: "t-1",
-      PJT: "やっちゃば",
+      PJT: "サンプルPJT",
       期限: "2026-06-15",
       優先度: "High",
       ラベル: "開発",
       status: "進行中",
       工数: "2h",
       depends: "なし",
-      担当: "高木",
+      担当: "山田",
       sync_meta: { last_sync: "2026-05-19T09:00:00.000Z" },
     },
   };
@@ -122,14 +122,14 @@ describe("mergeBoth column ownership", () => {
 describe("fmEquivalent (diff detection)", () => {
   const base = {
     task_id: "t-1",
-    PJT: "やっちゃば",
+    PJT: "サンプルPJT",
     期限: "2026-06-15",
     優先度: "High",
     ラベル: "開発",
     status: "進行中",
     工数: "2h",
     depends: "なし",
-    担当: "高木",
+    担当: "山田",
   };
   it("returns true when only sync_meta differs (ignored)", () => {
     const a = { ...base, sync_meta: { last_sync: "2026-05-19T09:00Z" } };
@@ -152,7 +152,7 @@ describe("rowEquivalent (diff detection)", () => {
     const r = new Array(14).fill("");
     r[COL.task_id] = "t-1";
     r[COL.title] = "テスト";
-    r[COL.PJT] = "やっちゃば";
+    r[COL.PJT] = "サンプルPJT";
     r[COL.status] = "進行中";
     r[COL.last_updated] = "2026-05-19T09:00Z";
     r[COL.origin] = "vault";
@@ -173,5 +173,79 @@ describe("rowEquivalent (diff detection)", () => {
     const a = row();
     const b = row({ [COL.status]: "完了" });
     expect(rowEquivalent(a, b)).toBe(false);
+  });
+});
+
+describe("SheetsSync self owner", () => {
+  function fakePlugin(data: Record<string, unknown>) {
+    let stored: Record<string, unknown> = data;
+    return {
+      loadData: async () => stored,
+      saveData: async (next: Record<string, unknown>) => {
+        stored = next;
+      },
+    };
+  }
+  const fakeApp = { vault: { getMarkdownFiles: () => [] } };
+  const fakeOAuth = {
+    getAccessToken: async () => {
+      throw new Error("network must not be reached in tests");
+    },
+  };
+
+  it("does not invent an owner name when none is configured", async () => {
+    const sync = new SheetsSync(fakeApp as any, fakePlugin({}) as any, fakeOAuth as any);
+    const config = await sync.getConfig();
+    expect(config.self_owner).toBeUndefined();
+  });
+
+  it("refuses to sync the org sheet until the owner folder is set", async () => {
+    const plugin = fakePlugin({ sync_config: { org: { spreadsheetId: "fake-sheet-id" } } });
+    const sync = new SheetsSync(fakeApp as any, plugin as any, fakeOAuth as any);
+    await expect(sync.syncScope("org")).rejects.toThrow(/self_owner/);
+  });
+
+  it("refuses to sync until the task folder is set", async () => {
+    const plugin = fakePlugin({ sync_config: { personal: { spreadsheetId: "fake-sheet-id" } } });
+    const sync = new SheetsSync(fakeApp as any, plugin as any, fakeOAuth as any);
+    await expect(sync.syncScope("personal")).rejects.toThrow(/タスクのノート|Task notes/);
+  });
+});
+
+describe("planSheetTask (creating a note from a sheet row)", () => {
+  it("files the note under the owner's folder inside the task folder", () => {
+    const plan = planSheetTask(makeSheetRow({ 担当: "alice", title: "Write spec" }), "now", "org", "me", "Tasks");
+    expect(plan.path).toBe("Tasks/alice/Write spec.md");
+    expect(plan.rejectedOwner).toBeNull();
+  });
+
+  it("refuses owner values that are not one folder name and files them as unassigned", () => {
+    for (const owner of ["../../outside", "a/b", "..", ".obsidian", "x\\y"]) {
+      const plan = planSheetTask(makeSheetRow({ 担当: owner }), "now", "org", "me", "Tasks");
+      expect(plan.path.startsWith("Tasks/未割当/"), owner).toBe(true);
+      expect(plan.rejectedOwner).toBe(owner);
+    }
+  });
+
+  it("keeps a hostile title inside the folder", () => {
+    const plan = planSheetTask(makeSheetRow({ 担当: "alice", title: "../../evil\nname" }), "now", "org", "me", "Tasks");
+    expect(plan.path.startsWith("Tasks/alice/")).toBe(true);
+    // ".." may appear inside a file name, but never as a path segment
+    expect(plan.path.split("/")).not.toContain("..");
+    expect(plan.path.split("/")).toHaveLength(3);
+    expect(plan.content.split("\n")[0]).toBe("---");
+  });
+
+  it("does not let cell line breaks add frontmatter keys or body text", () => {
+    const plan = planSheetTask(
+      makeSheetRow({ 担当: "alice", PJT: "X\nstatus: 完了\n---\n# injected" }),
+      "now",
+      "org",
+      "me",
+      "Tasks"
+    );
+    const fmBlock = plan.content.split("\n---\n")[0];
+    expect(fmBlock.match(/^status:/gm)).toHaveLength(1);
+    expect(plan.content).not.toMatch(/^# injected/m);
   });
 });
