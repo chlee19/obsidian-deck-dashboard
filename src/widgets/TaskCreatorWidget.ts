@@ -3,6 +3,8 @@ import type { WidgetDefinition, WidgetContext } from "./types";
 import { effectiveFolder } from "../core/settings";
 import { t } from "../core/i18n";
 import { renderFolderNotice } from "./setupNotice";
+import { requireSafeVaultPath, sanitizeFileTitle } from "../core/safePath";
+import { formatYamlScalar } from "../core/yamlScalar";
 
 interface Settings {
   folder: string;
@@ -155,29 +157,37 @@ function renderForm(el: HTMLElement, settings: Settings, ctx: WidgetContext): vo
       titleInput.focus();
       return;
     }
-    const folder = normalizePath(settings.folder);
+    // The folder may come from a .dashboard file: keep writes inside the vault.
+    let folder: string;
+    try {
+      folder = requireSafeVaultPath(normalizePath(settings.folder), "");
+    } catch (e) {
+      new Notice((e as Error).message, 8000);
+      return;
+    }
     if (!ctx.app.vault.getAbstractFileByPath(folder)) {
       await ctx.app.vault.createFolder(folder);
     }
-    const filename = sanitize(title) + ".md";
-    let path = `${folder}/${filename}`;
+    const name = sanitizeFileTitle(title);
+    let path = requireSafeVaultPath(`${folder}/${name}.md`, folder);
     let i = 2;
     while (ctx.app.vault.getAbstractFileByPath(path)) {
-      path = `${folder}/${sanitize(title)} ${i}.md`;
+      path = requireSafeVaultPath(`${folder}/${name} ${i}.md`, folder);
       i++;
     }
+    const y = formatYamlScalar;
     const fm = [
       "---",
-      `PJT: ${state.pjt || "なし"}`,
-      `期限: ${state.deadline || "なし"}`,
-      `優先度: ${state.priority}`,
-      `ラベル: ${state.label || "なし"}`,
-      `status: ${state.status}`,
-      `工数: ${state.duration || "1h"}`,
+      `PJT: ${y(state.pjt || "なし")}`,
+      `期限: ${y(state.deadline || "なし")}`,
+      `優先度: ${y(state.priority)}`,
+      `ラベル: ${y(state.label || "なし")}`,
+      `status: ${y(state.status)}`,
+      `工数: ${y(state.duration || "1h")}`,
       `depends: なし`,
       "---",
       "",
-      `# ${title}`,
+      `# ${title.replace(/\s+/g, " ")}`,
       "",
     ].join("\n");
     const file = await ctx.app.vault.create(path, fm);
@@ -209,8 +219,4 @@ function mkLabeledInput(
   if (placeholder) input.placeholder = placeholder;
   input.addEventListener("input", () => onChange(input.value));
   return input;
-}
-
-function sanitize(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, "_").trim() || "Untitled";
 }

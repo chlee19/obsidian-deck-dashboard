@@ -30,6 +30,8 @@ export interface DeckSettings {
    * .dashboard files. See core/claudeCommand.ts for what is allowed.
    */
   claudeCommand: string;
+  /** Fetch iCal URLs on localhost / private / link-local hosts. Off by default. */
+  allowPrivateCalendarUrls: boolean;
 }
 
 /** Key in data.json. */
@@ -57,6 +59,7 @@ export const FRESH_SETTINGS: DeckSettings = {
   searchExcludeFolders: [],
   openHomeOnStartup: false,
   claudeCommand: "claude",
+  allowPrivateCalendarUrls: false,
 };
 
 /**
@@ -76,6 +79,7 @@ export const LEGACY_SETTINGS: DeckSettings = {
   searchExcludeFolders: ["ログ", "アーカイブ", "添付", "inbox/temp"],
   openHomeOnStartup: false,
   claudeCommand: "claude",
+  allowPrivateCalendarUrls: false,
 };
 
 /** What a plugin exposes to views, widgets and helpers. */
@@ -142,6 +146,10 @@ function pickSettings(stored: PlainObject, defaults: DeckSettings, mail: PlainOb
         ? stored.openHomeOnStartup
         : defaults.openHomeOnStartup,
     claudeCommand: pickClaudeCommand(stored, mail, defaults),
+    allowPrivateCalendarUrls:
+      typeof stored.allowPrivateCalendarUrls === "boolean"
+        ? stored.allowPrivateCalendarUrls
+        : defaults.allowPrivateCalendarUrls,
   };
 }
 

@@ -5,6 +5,8 @@ import { SheetsSync, SyncScope } from "../sync/sheetsSync";
 import { AutoSyncWatcher } from "../sync/autoSyncWatcher";
 import { loadMailConfig, saveMailConfig } from "../core/mailConfig";
 import { renderDeckSettings, type SettingsSectionHost } from "./DeckSettingsSection";
+import { updatePluginData } from "../core/pluginData";
+import { renderCalendarSources } from "./CalendarSourcesSection";
 
 /**
  * Settings tab under "Deck" in Obsidian → Settings → Community plugins.
@@ -28,6 +30,7 @@ export class SyncSettingsTab extends PluginSettingTab {
     containerEl.empty();
 
     renderDeckSettings(containerEl, this.app, this.plugin);
+    await renderCalendarSources(containerEl, this.plugin, this.plugin, () => this.display());
     await this.renderGoogleAuthSection(containerEl);
     await this.renderSelfOwnerSection(containerEl);
     await this.renderScopeSection(containerEl, "personal", "個人タスク");
@@ -263,8 +266,8 @@ export class SyncSettingsTab extends PluginSettingTab {
   }
 
   private async saveConfig(next: unknown): Promise<void> {
-    const data = ((await this.plugin.loadData()) ?? {}) as Record<string, unknown>;
-    data.sync_config = next;
-    await this.plugin.saveData(data);
+    await updatePluginData(this.plugin, (data) => {
+      data.sync_config = next;
+    });
   }
 }

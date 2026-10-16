@@ -44,6 +44,20 @@ export interface Strings {
   claudeCommandDesc: string;
   claudeCommandRejected: (reason: CommandRejectReason) => string;
   dashboardCommandIgnored: (value: string) => string;
+  settingsCalendarsHeading: string;
+  settingsCalendarsDesc: string;
+  calendarNameLabel: string;
+  calendarUrlLabel: string;
+  calendarAdd: string;
+  calendarRemove: string;
+  calendarNeedsNameAndUrl: string;
+  calendarAllowPrivateName: string;
+  calendarAllowPrivateDesc: string;
+  calendarRefused: (reason: "invalid" | "scheme" | "private") => string;
+  calendarUnknownName: (name: string) => string;
+  calendarWidgetSourceName: string;
+  calendarWidgetSourceDesc: string;
+  calendarWidgetUrlDesc: string;
 
   basesLabel: string;
   basesDescription: string;
@@ -141,6 +155,28 @@ const en: Strings = {
   },
   dashboardCommandIgnored: (value) =>
     `This dashboard asks to run “${value}”. Deck only runs the Claude Code command from Settings → Deck, so that value was ignored.`,
+  settingsCalendarsHeading: "Calendars (iCal)",
+  settingsCalendarsDesc:
+    "Register private calendar addresses here and refer to them by name in Calendar widgets. The address stays on this device (secret storage when available) instead of being written into .dashboard files.",
+  calendarNameLabel: "Name",
+  calendarUrlLabel: "iCal URL",
+  calendarAdd: "Add",
+  calendarRemove: "Remove",
+  calendarNeedsNameAndUrl: "Enter both a name and an http(s) iCal URL.",
+  calendarAllowPrivateName: "Allow calendars on local or private networks",
+  calendarAllowPrivateDesc:
+    "Off by default: addresses such as localhost, 192.168.x.x or 10.x.x.x are not fetched, so a dashboard received from someone else cannot make Obsidian contact devices on your network. Turn on only for calendars you host there yourself.",
+  calendarRefused: (reason) =>
+    reason === "scheme"
+      ? "Only http(s) calendar addresses are fetched."
+      : reason === "private"
+        ? "This address is on a local or private network, so it was not fetched. Allow it in Settings → Deck if it is your own calendar."
+        : "This is not a valid calendar address.",
+  calendarUnknownName: (name) => `No calendar named “${name}” is registered in Settings → Deck on this device.`,
+  calendarWidgetSourceName: "Calendar name",
+  calendarWidgetSourceDesc: "A calendar registered in Settings → Deck → Calendars. Recommended for private addresses.",
+  calendarWidgetUrlDesc:
+    "Direct URL (kept for older dashboards). It is saved inside the .dashboard file, so anyone you share or sync the file with can read the calendar — register private addresses by name instead.",
 
   basesLabel: "Base (.base)",
   basesDescription: "Shows a .base file (Obsidian Bases) inside the dashboard.",
@@ -248,6 +284,28 @@ const ja: Strings = {
   },
   dashboardCommandIgnored: (value) =>
     `このダッシュボードには「${value}」を実行する設定が書かれています。Deck は 設定 → Deck の Claude Code のコマンドだけを実行するので、この値は使いませんでした。`,
+  settingsCalendarsHeading: "カレンダー (iCal)",
+  settingsCalendarsDesc:
+    "非公開のカレンダー URL はここに名前を付けて登録し、Calendar ウィジェットからは名前で参照してください。URL は .dashboard ファイルに書かれず、この端末に保存されます（使えるときはシークレットストレージ）。",
+  calendarNameLabel: "名前",
+  calendarUrlLabel: "iCal URL",
+  calendarAdd: "追加",
+  calendarRemove: "削除",
+  calendarNeedsNameAndUrl: "名前と http(s) の iCal URL の両方を入れてください。",
+  calendarAllowPrivateName: "ローカル・プライベートネットワークのカレンダーを許可する",
+  calendarAllowPrivateDesc:
+    "既定はオフです。localhost や 192.168.x.x、10.x.x.x などの宛先は取得しないので、他人から受け取ったダッシュボードが手元のネットワーク内の機器に接続させることはできません。自分でそこにカレンダーを置いているときだけオンにしてください。",
+  calendarRefused: (reason) =>
+    reason === "scheme"
+      ? "http(s) のカレンダー URL だけを取得します。"
+      : reason === "private"
+        ? "ローカルまたはプライベートネットワークの宛先なので取得しませんでした。自分のカレンダーなら 設定 → Deck で許可してください。"
+        : "カレンダーの URL として正しくありません。",
+  calendarUnknownName: (name) => `「${name}」という名前のカレンダーは、この端末の 設定 → Deck に登録されていません。`,
+  calendarWidgetSourceName: "カレンダー名",
+  calendarWidgetSourceDesc: "設定 → Deck → カレンダー に登録した名前です。非公開 URL はこちらを使ってください。",
+  calendarWidgetUrlDesc:
+    "URL の直接指定（以前のダッシュボードとの互換用）。.dashboard ファイルに保存されるので、共有・同期した相手もカレンダーを読めます。非公開 URL は名前で登録してください。",
 
   basesLabel: "Base (.base)",
   basesDescription: ".base ファイル（Obsidian Bases）をダッシュボードの中に表示します。",

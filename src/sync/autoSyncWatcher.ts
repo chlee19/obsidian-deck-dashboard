@@ -2,6 +2,7 @@ import { App, Notice, Plugin, TAbstractFile, TFile } from "obsidian";
 import { GoogleOAuth } from "../auth/googleOAuth";
 import { SheetsSync } from "./sheetsSync";
 import { settingsOf } from "../core/settings";
+import { readPluginData, updatePluginData } from "../core/pluginData";
 
 const DEBOUNCE_MS = 2000;
 const SETTLE_AFTER_SYNC_MS = 2000;
@@ -34,15 +35,15 @@ export class AutoSyncWatcher {
   }
 
   async isEnabled(): Promise<boolean> {
-    const data = ((await this.plugin.loadData()) ?? {}) as AutoSyncSettings;
+    const data = (await readPluginData(this.plugin)) as AutoSyncSettings;
     // Default ON when sheet is configured.
     return data.auto_sync !== false;
   }
 
   async setEnabled(value: boolean): Promise<void> {
-    const data = ((await this.plugin.loadData()) ?? {}) as AutoSyncSettings;
-    data.auto_sync = value;
-    await this.plugin.saveData(data);
+    await updatePluginData(this.plugin, (data) => {
+      data.auto_sync = value;
+    });
   }
 
   private onModify(file: TAbstractFile): void {

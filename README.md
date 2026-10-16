@@ -20,7 +20,7 @@ Deck puts your tasks, calendar and notes on one dashboard, so the moment you ope
 | Base | A `.base` file (Obsidian Bases), optionally one of its views, shown the same way as `![[file.base]]` in a note | Obsidian 1.9+ with the Bases core plugin on; otherwise the widget says so |
 | Markdown | Free text written in Markdown | — |
 | Note embed | A preview of one note | — |
-| Calendar (iCal) | Events from an iCal (`.ics`) URL, such as a private calendar address | An iCal URL |
+| Calendar (iCal) | Events from an iCal (`.ics`) calendar | A calendar registered by name in Settings → Deck (or a URL) |
 | Google Calendar | Your Google Calendar events | Google sign-in (desktop) |
 | Mail (Gmail) | Your Gmail inbox; opens a mail pane with threads, labels, attachments and AI reply drafts | Google sign-in (desktop) |
 | AI search | Ask in natural language; Claude picks the matching notes and explains why | Claude Code CLI or an Anthropic API key |
@@ -59,6 +59,8 @@ Settings → Deck starts with the home dashboard and the folders widgets read. E
 | Sheets sync logs | One line per sync in a daily `.jsonl` file | Not set (no log) |
 | Notes saved from AI search | The "save as note" button of AI search | Not set |
 | Folders excluded from AI search | AI search and AI mail replies | None |
+| Calendars (iCal) | Calendar widgets refer to a registered name instead of storing the address | None |
+| Allow calendars on local or private networks | Calendar widgets may fetch `localhost`, `10.x`, `192.168.x` … addresses | Off |
 | Claude Code command | AI search, AI mail replies and AI delegation: `claude` from your PATH, or the absolute path of an executable. Only enter a program you trust | `claude` |
 
 A folder written in a widget's own settings (⚙) wins over these. Folders already written in an existing `.dashboard` file are kept as they are.
@@ -112,7 +114,7 @@ Deck does not collect analytics or telemetry. It only connects to a service when
 | Google Calendar widget | `www.googleapis.com/calendar/v3` | Read-only requests for your calendars and events |
 | Mail (Gmail) | `www.googleapis.com/gmail/v1` | Reads threads, labels and attachments; changes labels, moves mail to trash and creates drafts when you ask. Deck never sends mail itself: it creates a draft and opens `mail.google.com` in your browser for you to send. |
 | Sheets sync | `sheets.googleapis.com/v4` | Creates a spreadsheet and reads/writes the task rows (title, project, owner, due date, status …) |
-| Calendar (iCal) widget | The URL you enter | A GET request for the calendar file |
+| Calendar (iCal) widget | The calendar address you registered (or wrote in the widget) | A GET request for the calendar file. Only `http(s)` is fetched (`webcal://` is read as `https://`), and local or private-network hosts are skipped unless you allow them |
 | AI search / AI mail reply, API backend | `api.anthropic.com` | Your question (or the mail thread) and short excerpts of the notes picked as candidates, with your Anthropic API key |
 | AI search / AI mail reply / AI delegation, Claude Code backend | Runs the `claude` command on your computer (the command set in Settings → Deck; dashboard files cannot change it) | The same prompt is passed to Claude Code, which talks to Anthropic with your own Claude account. "Web で調べる" asks Claude Code to search the web. |
 | AI delegation | Runs `claude` in your vault folder | Claude Code can read and edit files and run commands in the vault, within the permission mode you choose |
@@ -121,9 +123,9 @@ Google OAuth uses a client you create yourself in Google Cloud. Requested scopes
 
 ### What is stored where
 
-- Credentials (the Google OAuth client, Google tokens and the Anthropic API key): on Obsidian 1.11.4 and later they are kept in Obsidian's secret storage (the device keychain), not in the vault folder. Values saved by older versions are moved there the first time they are used. Secret storage is not synced with the vault, so on another device you may need to sign in to Google or enter the API key again. On older Obsidian versions, or when secure storage is not available, they stay in `data.json` in plain text.
+- Credentials (the Google OAuth client, Google tokens, the Anthropic API key and registered calendar addresses): on Obsidian 1.11.4 and later they are kept in Obsidian's secret storage (the device keychain), not in the vault folder. Values saved by older versions are moved there the first time they are used. Secret storage is not synced with the vault, so on another device you may need to sign in to Google or enter the API key again. On older Obsidian versions, or when secure storage is not available, they stay in `data.json` in plain text.
 - `<vault>/.obsidian/plugins/deck-dashboard/data.json`: settings and the Sheets sync configuration (spreadsheet IDs). Keep this file out of public repositories and shared vaults all the same.
-- `.dashboard` files: each widget's settings, including an iCal URL you paste. A private iCal address works like a password, so don't share a dashboard that contains one.
+- `.dashboard` files: each widget's settings. A private iCal address works like a password, so register it in **Settings → Deck → Calendars** and refer to it by name; a URL pasted directly into a widget is saved inside the `.dashboard` file, where anyone you share or sync it with can read it. Registered addresses are kept with the credentials above.
 - AI delegation logs and Sheets sync logs are written as notes in the folders you choose.
 
 ## Development

@@ -1,4 +1,5 @@
 import type { Plugin } from "obsidian";
+import { readPluginData, updatePluginData } from "./pluginData";
 
 export type MailBackend = "claude-code" | "api";
 
@@ -32,12 +33,12 @@ interface PluginData {
 }
 
 export async function loadMailConfig(plugin: Plugin): Promise<MailConfig> {
-  const data = (await plugin.loadData()) as PluginData | null;
-  return mergeMailConfig(data?.mail_config);
+  const data = (await readPluginData(plugin)) as PluginData;
+  return mergeMailConfig(data.mail_config);
 }
 
 export async function saveMailConfig(plugin: Plugin, next: MailConfig): Promise<void> {
-  const data = ((await plugin.loadData()) ?? {}) as PluginData;
-  data.mail_config = next;
-  await plugin.saveData(data);
+  await updatePluginData(plugin, (data) => {
+    data.mail_config = next;
+  });
 }

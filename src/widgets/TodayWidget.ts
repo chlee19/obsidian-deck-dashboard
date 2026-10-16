@@ -3,6 +3,7 @@ import type { WidgetDefinition } from "./types";
 import { readCoreDailyNotes, resolveDailyNote, type DailyFormat } from "../core/dailyNote";
 import { t } from "../core/i18n";
 import { renderFolderNotice } from "./setupNotice";
+import { safeVaultPath } from "../core/safePath";
 
 interface Settings {
   /** Empty = Settings → Deck, then the core Daily notes plugin. */
@@ -60,7 +61,13 @@ export const todayWidget: WidgetDefinition<Settings> = {
       renderFolderNotice(linkRow, ctx, t().dailyFolderName);
       return;
     }
-    const dailyPath = target.path;
+    // The folder may come from a .dashboard file: only paths inside the vault.
+    const safe = safeVaultPath(target.path, "");
+    if (!safe.ok) {
+      linkRow.createEl("p", { cls: "nd-error", text: `Daily note path refused: ${safe.reason}` });
+      return;
+    }
+    const dailyPath = safe.path;
     const existing = ctx.app.vault.getAbstractFileByPath(dailyPath);
     const dailyLink = linkRow.createEl("a", {
       cls: "nd-today-daily-link",

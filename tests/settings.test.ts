@@ -114,6 +114,17 @@ describe("claudeCommand setting", () => {
   });
 });
 
+describe("allowPrivateCalendarUrls setting", () => {
+  it("is off unless the user turned it on", () => {
+    expect(migratePluginData(null, noLegacyHome).settings.allowPrivateCalendarUrls).toBe(false);
+    expect(migratePluginData({ x: 1 }, noLegacyHome).settings.allowPrivateCalendarUrls).toBe(false);
+    expect(
+      migratePluginData({ [SETTINGS_KEY]: { allowPrivateCalendarUrls: true } }, noLegacyHome).settings
+        .allowPrivateCalendarUrls
+    ).toBe(true);
+  });
+});
+
 describe("cleanFolder", () => {
   it("trims spaces and slashes", () => {
     expect(cleanFolder("  /Tasks/Open/ ")).toBe("Tasks/Open");

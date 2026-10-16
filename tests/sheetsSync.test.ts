@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SheetsSync, __test } from "../src/sync/sheetsSync";
 
-const { mergeBoth, COL, HEADER_ROW, fmEquivalent, rowEquivalent } = __test;
+const { mergeBoth, COL, HEADER_ROW, fmEquivalent, rowEquivalent, planSheetTask } = __test;
 
 describe("HEADER_ROW", () => {
   it("has 14 columns matching the design", () => {
@@ -209,5 +209,43 @@ describe("SheetsSync self owner", () => {
     const plugin = fakePlugin({ sync_config: { personal: { spreadsheetId: "fake-sheet-id" } } });
     const sync = new SheetsSync(fakeApp as any, plugin as any, fakeOAuth as any);
     await expect(sync.syncScope("personal")).rejects.toThrow(/タスクのノート|Task notes/);
+  });
+});
+
+describe("planSheetTask (creating a note from a sheet row)", () => {
+  it("files the note under the owner's folder inside the task folder", () => {
+    const plan = planSheetTask(makeSheetRow({ 担当: "alice", title: "Write spec" }), "now", "org", "me", "Tasks");
+    expect(plan.path).toBe("Tasks/alice/Write spec.md");
+    expect(plan.rejectedOwner).toBeNull();
+  });
+
+  it("refuses owner values that are not one folder name and files them as unassigned", () => {
+    for (const owner of ["../../outside", "a/b", "..", ".obsidian", "x\\y"]) {
+      const plan = planSheetTask(makeSheetRow({ 担当: owner }), "now", "org", "me", "Tasks");
+      expect(plan.path.startsWith("Tasks/未割当/"), owner).toBe(true);
+      expect(plan.rejectedOwner).toBe(owner);
+    }
+  });
+
+  it("keeps a hostile title inside the folder", () => {
+    const plan = planSheetTask(makeSheetRow({ 担当: "alice", title: "../../evil\nname" }), "now", "org", "me", "Tasks");
+    expect(plan.path.startsWith("Tasks/alice/")).toBe(true);
+    // ".." may appear inside a file name, but never as a path segment
+    expect(plan.path.split("/")).not.toContain("..");
+    expect(plan.path.split("/")).toHaveLength(3);
+    expect(plan.content.split("\n")[0]).toBe("---");
+  });
+
+  it("does not let cell line breaks add frontmatter keys or body text", () => {
+    const plan = planSheetTask(
+      makeSheetRow({ 担当: "alice", PJT: "X\nstatus: 完了\n---\n# injected" }),
+      "now",
+      "org",
+      "me",
+      "Tasks"
+    );
+    const fmBlock = plan.content.split("\n---\n")[0];
+    expect(fmBlock.match(/^status:/gm)).toHaveLength(1);
+    expect(plan.content).not.toMatch(/^# injected/m);
   });
 });

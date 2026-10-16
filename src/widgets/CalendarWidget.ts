@@ -1,8 +1,14 @@
 import { Setting } from "obsidian";
 import type { WidgetDefinition } from "./types";
 import { fetchIcal, parseEventsInRange, type CalEvent } from "../adapters/ical";
+import { checkCalendarUrl, resolveCalendarSource } from "../core/icalSource";
+import { loadCalendarSources } from "../ui/CalendarSourcesSection";
+import { t } from "../core/i18n";
 
 interface Settings {
+  /** Name registered in Settings → Deck → Calendars (preferred). */
+  source?: string;
+  /** Direct URL, kept for older dashboards. Stored inside the .dashboard file. */
   icalUrl: string;
   windowDays: number;
   maxEvents: number;
@@ -63,29 +69,42 @@ export const calendarWidget: WidgetDefinition<Settings> = {
   type: "calendar",
   label: "Calendar (iCal)",
   description:
-    "Google/Outlook/Apple カレンダーの予定を表示。設定でカレンダーの「秘密のiCal URL」を貼り付け。",
+    "Google/Outlook/Apple カレンダーの予定を表示。非公開の iCal URL は 設定 → Deck → カレンダー に名前で登録して参照。",
   defaultSettings: () => ({
+    source: "",
     icalUrl: "",
     windowDays: 7,
     maxEvents: 30,
   }),
-  async render(el, settings, _ctx) {
+  async render(el, settings, ctx) {
     el.empty();
     el.addClass("nd-widget-calendar");
-    if (!settings.icalUrl) {
+    const strings = t();
+    const resolved = resolveCalendarSource(settings, await loadCalendarSources(ctx.plugin));
+    if (resolved.kind === "unknown-name") {
+      el.createEl("p", { cls: "nd-empty", text: strings.calendarUnknownName(resolved.name) });
+      return;
+    }
+    if (resolved.kind === "unset") {
       const help = el.createDiv({ cls: "nd-empty" });
       help.createEl("p", { text: "iCal URL が未設定です。" });
       const ol = help.createEl("ol");
       ol.createEl("li", {
         text: "Google カレンダー: 設定 → カレンダー → 該当カレンダー → 「カレンダーの統合」→「カレンダーの非公開URL（iCal形式）」をコピー",
       });
-      ol.createEl("li", { text: "⚙ から設定を開いて URL を貼り付け" });
+      ol.createEl("li", { text: "設定 → Deck → カレンダー に名前を付けて URL を登録し、⚙ でその名前を指定" });
+      return;
+    }
+    // Received dashboards must not make Obsidian contact arbitrary hosts.
+    const check = checkCalendarUrl(resolved.url, ctx.settings.allowPrivateCalendarUrls);
+    if (!check.ok) {
+      el.createEl("p", { cls: "nd-empty", text: strings.calendarRefused(check.reason) });
       return;
     }
 
     const status = el.createDiv({ cls: "nd-muted", text: "読み込み中…" });
     try {
-      const ics = await getIcs(settings.icalUrl);
+      const ics = await getIcs(check.url);
       const start = startOfToday();
       const end = new Date(start);
       end.setDate(end.getDate() + Math.max(1, settings.windowDays));
@@ -125,13 +144,20 @@ export const calendarWidget: WidgetDefinition<Settings> = {
     }
   },
   renderSettingsForm(container, settings, onChange) {
+    const strings = t();
+    new Setting(container)
+      .setName(strings.calendarWidgetSourceName)
+      .setDesc(strings.calendarWidgetSourceDesc)
+      .addText((text) =>
+        text.setValue(settings.source ?? "").onChange((v) => onChange({ ...settings, source: v.trim() }))
+      );
     new Setting(container)
       .setName("iCal URL")
-      .setDesc("Googleカレンダーの「カレンダーの非公開URL（iCal形式）」など。https://～.ics で終わるURL")
-      .addText((t) => {
-        t.setValue(settings.icalUrl);
-        t.inputEl.addClass("deck-input-full");
-        t.onChange((v) => onChange({ ...settings, icalUrl: v.trim() }));
+      .setDesc(strings.calendarWidgetUrlDesc)
+      .addText((text) => {
+        text.setValue(settings.icalUrl);
+        text.inputEl.addClass("deck-input-full");
+        text.onChange((v) => onChange({ ...settings, icalUrl: v.trim() }));
       });
     new Setting(container)
       .setName("表示日数")

@@ -21,6 +21,8 @@ import {
   type DeckHost,
   type DeckSettings,
 } from "./core/settings";
+import { updatePluginData } from "./core/pluginData";
+import { migrateAllSecrets } from "./core/secrets";
 
 /** Minimal shape of Obsidian's (untyped) internal command registry. */
 interface CommandRegistry {
@@ -48,6 +50,8 @@ export default class DeckPlugin extends Plugin implements DeckHost {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    // Before any view renders: move credentials out of data.json in one step.
+    await migrateAllSecrets(this);
     this.init();
   }
 
@@ -61,14 +65,19 @@ export default class DeckPlugin extends Plugin implements DeckHost {
       raw === null ? await this.app.vault.adapter.exists(LEGACY_HOME_PATH) : false;
     const result = migratePluginData(raw, { legacyHomeExists });
     this.settings = result.settings;
-    if (result.changed) await this.saveData(result.data);
+    if (result.changed) {
+      await updatePluginData(this, (data) => {
+        for (const k of Object.keys(data)) delete data[k];
+        Object.assign(data, result.data);
+      });
+    }
   }
 
   /** Persist settings (other data.json keys are kept) and redraw dashboards. */
   async saveSettings(): Promise<void> {
-    const data = ((await this.loadData()) ?? {}) as Record<string, unknown>;
-    data[SETTINGS_KEY] = this.settings;
-    await this.saveData(data);
+    await updatePluginData(this, (data) => {
+      data[SETTINGS_KEY] = this.settings;
+    });
     this.refreshDashboards();
   }
 

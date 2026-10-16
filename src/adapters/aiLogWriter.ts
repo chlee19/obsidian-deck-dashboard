@@ -1,5 +1,6 @@
 import { App, TFile, normalizePath } from "obsidian";
 import type { StreamEvent } from "./claudeCodeStream";
+import { requireSafeVaultPath, sanitizeFileTitle } from "../core/safePath";
 
 /**
  * Writes an AI delegation run to its own markdown file in real-time,
@@ -14,9 +15,9 @@ export class AILogWriter {
       throw new Error("AI delegation log folder is not set (Settings → Deck).");
     }
     const ts = formatStamp(new Date());
-    const folder = normalizePath(logFolder);
+    const folder = requireSafeVaultPath(normalizePath(logFolder), "");
     await ensureFolder(app, folder);
-    const path = `${folder}/${ts}_${safeName(taskBasename)}.md`;
+    const path = requireSafeVaultPath(`${folder}/${ts}_${safeName(taskBasename)}.md`, folder);
     return new AILogWriter(app, path);
   }
 
@@ -143,7 +144,7 @@ function formatDateTime(d: Date): string {
 }
 
 function safeName(s: string): string {
-  return s.replace(/[\\/:*?"<>|]/g, "_").slice(0, 60);
+  return sanitizeFileTitle(s).slice(0, 60);
 }
 
 function oneline(s: string | undefined): string {

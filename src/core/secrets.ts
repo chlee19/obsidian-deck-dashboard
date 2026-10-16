@@ -1,14 +1,18 @@
 import type { Plugin } from "obsidian";
+import { updatePluginData } from "./pluginData";
 
 /** The data.json keys that hold credentials. */
-export type SecretKey = "google_credentials" | "google_tokens" | "anthropic_api_key";
+export type SecretKey = "google_credentials" | "google_tokens" | "anthropic_api_key" | "ical_sources";
 
 /** IDs in Obsidian's secret storage (lowercase alphanumeric with dashes). */
 const SECRET_IDS: Record<SecretKey, string> = {
   google_credentials: "deck-dashboard-google-credentials",
   google_tokens: "deck-dashboard-google-tokens",
   anthropic_api_key: "deck-dashboard-anthropic-api-key",
+  ical_sources: "deck-dashboard-ical-sources",
 };
+
+const ALL_KEYS = Object.keys(SECRET_IDS) as SecretKey[];
 
 /** Obsidian's SecretStorage (1.11.4+). */
 export interface SecretBackend {
@@ -42,37 +46,67 @@ export class SecretStore {
   }
 
   async get<T = unknown>(key: SecretKey): Promise<T | null> {
+    const id = SECRET_IDS[key];
     const backend = this.backend();
-    if (backend) {
-      const raw = tryGet(backend, SECRET_IDS[key]);
-      if (raw) return decode<T>(key, raw);
-    }
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginData;
-    const legacy = data[key];
+    const stored = backend ? tryGet(backend, id) : null;
+    let legacy: unknown = undefined;
+    // Every data.json step goes through the shared queue, so concurrent
+    // reads of different keys cannot save stale copies over each other.
+    await updatePluginData(this.plugin, (data) => {
+      if (!(key in data)) return false;
+      const value = data[key];
+      const empty = value === null || value === "";
+      if (backend && (stored || empty || trySet(backend, id, encode(value)))) {
+        // Already in (or now moved to) secret storage: drop the plain copy.
+        if (!stored) legacy = value;
+        delete data[key];
+        return;
+      }
+      legacy = value; // no usable secret storage: keep using data.json
+      return false;
+    });
+    if (stored) return decode<T>(key, stored);
     if (legacy === undefined || legacy === null || legacy === "") return null;
-    if (backend && trySet(backend, SECRET_IDS[key], encode(legacy))) {
-      delete data[key];
-      await this.plugin.saveData(data);
-    }
     return legacy as T;
   }
 
   /** Store a value, or clear it with null. */
   async set(key: SecretKey, value: unknown): Promise<void> {
     const backend = this.backend();
-    const data = ((await this.plugin.loadData()) ?? {}) as PluginData;
     const encoded = value === null || value === undefined ? "" : encode(value);
-    if (backend && trySet(backend, SECRET_IDS[key], encoded)) {
-      if (key in data) {
+    const inSecretStorage = backend ? trySet(backend, SECRET_IDS[key], encoded) : false;
+    await updatePluginData(this.plugin, (data) => {
+      if (inSecretStorage || value === null || value === undefined) {
+        if (!(key in data)) return false;
         delete data[key];
-        await this.plugin.saveData(data);
+        return;
       }
-      return;
-    }
-    if (value === null || value === undefined) delete data[key];
-    else data[key] = value;
-    await this.plugin.saveData(data);
+      data[key] = value;
+    });
   }
+}
+
+/**
+ * Move every credential still in data.json into secret storage at once.
+ * Run from onload before any view renders. No-op without secret storage.
+ */
+export async function migrateAllSecrets(plugin: Plugin): Promise<void> {
+  const backend = secretBackendOf(plugin.app);
+  if (!backend) return;
+  await updatePluginData(plugin, (data) => {
+    let changed = false;
+    for (const key of ALL_KEYS) {
+      if (!(key in data)) continue;
+      const value = data[key];
+      const already = tryGet(backend, SECRET_IDS[key]);
+      if (!already && value !== null && value !== undefined && value !== "") {
+        if (!trySet(backend, SECRET_IDS[key], encode(value))) continue; // keep it
+      }
+      delete data[key];
+      changed = true;
+    }
+    return changed ? undefined : false;
+  });
 }
 
 function tryGet(backend: SecretBackend, id: string): string | null {

@@ -3,6 +3,7 @@ import { DASHBOARD_EXTENSION, VIEW_TYPE_DASHBOARD, VIEW_TYPE_MAIL } from "./core
 import { findLeafShowingFile, startupLeafMode } from "./core/homeLeaf";
 import { dashboardFolderPath, homeDashboardPath, type DeckHost } from "./core/settings";
 import { t } from "./core/i18n";
+import { requireSafeVaultPath } from "./core/safePath";
 import {
   createDefaultDashboard,
   serializeDashboard,
@@ -24,7 +25,9 @@ export function registerCommands(plugin: CommandHost): void {
     id: "create-new",
     name: "Create new dashboard",
     callback: async () => {
-      await createNewDashboard(plugin, "Untitled", createDefaultDashboard("Untitled"));
+      await createNewDashboard(plugin, "Untitled", createDefaultDashboard("Untitled")).catch(
+        (e: unknown) => new Notice((e as Error).message, 8000)
+      );
     },
   });
 
@@ -32,7 +35,7 @@ export function registerCommands(plugin: CommandHost): void {
     id: "open-home",
     name: "Open home dashboard",
     callback: async () => {
-      await openHomeDashboard(plugin);
+      await openHomeDashboard(plugin).catch((e: unknown) => new Notice((e as Error).message, 8000));
     },
   });
 
@@ -54,7 +57,7 @@ export function registerCommands(plugin: CommandHost): void {
     id: "reset-home",
     name: "Reset home dashboard to template",
     callback: async () => {
-      await resetHomeDashboard(plugin);
+      await resetHomeDashboard(plugin).catch((e: unknown) => new Notice((e as Error).message, 8000));
     },
   });
 
@@ -253,12 +256,13 @@ async function createNewDashboard(
   baseTitle: string,
   initial: Dashboard
 ): Promise<TFile> {
-  const folder = dashboardFolderPath(plugin.settings);
+  const configured = dashboardFolderPath(plugin.settings);
+  const folder = configured ? requireSafeVaultPath(configured, "") : "";
   if (folder) await ensureFolder(plugin, folder);
   const baseName = sanitizeFilename(baseTitle);
-  const path = await uniquePath(
-    plugin,
-    normalizePath(`${folder ? folder + "/" : ""}${baseName}.${DASHBOARD_EXTENSION}`)
+  const path = requireSafeVaultPath(
+    await uniquePath(plugin, normalizePath(`${folder ? folder + "/" : ""}${baseName}.${DASHBOARD_EXTENSION}`)),
+    folder
   );
   const file = await plugin.app.vault.create(path, serializeDashboard(initial));
   await openInDashboardView(plugin, file);
@@ -297,7 +301,7 @@ export async function openHomeDashboard(
   opts: { atStartup?: boolean } = {}
 ): Promise<void> {
   const { workspace } = plugin.app;
-  const homePath = normalizePath(homeDashboardPath(plugin.settings));
+  const homePath = requireSafeVaultPath(normalizePath(homeDashboardPath(plugin.settings)), "");
   const open = findLeafShowingFile(workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD), homePath);
   if (open) {
     workspace.setActiveLeaf(open, { focus: true });
@@ -327,7 +331,7 @@ export async function openHomeDashboard(
 }
 
 async function resetHomeDashboard(plugin: CommandHost): Promise<void> {
-  const homePath = normalizePath(homeDashboardPath(plugin.settings));
+  const homePath = requireSafeVaultPath(normalizePath(homeDashboardPath(plugin.settings)), "");
   const existing = plugin.app.vault.getAbstractFileByPath(homePath);
 
   const confirmed = await confirmModal(

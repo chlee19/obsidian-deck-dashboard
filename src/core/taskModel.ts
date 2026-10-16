@@ -1,5 +1,6 @@
 import { App, TFile } from "obsidian";
 import { cleanFolder } from "./settings";
+import { formatYamlScalar, parseYamlScalar } from "./yamlScalar";
 
 export interface TaskFrontmatter {
   task_id?: string;
@@ -147,7 +148,7 @@ export function parseFrontmatter(raw: string): TaskFrontmatter {
       continue;
     }
     const key = m[1].trim();
-    const value = m[2].trim();
+    const value = parseYamlScalar(m[2]);
     if (key === "sync_meta" && value === "") {
       // Nested block: read indented children
       const meta: NonNullable<TaskFrontmatter["sync_meta"]> = {};
@@ -156,7 +157,7 @@ export function parseFrontmatter(raw: string): TaskFrontmatter {
         const child = /^\s+([^:]+):\s*(.*)$/.exec(lines[i]);
         if (child) {
           const ck = child[1].trim();
-          const cv = child[2].trim();
+          const cv = parseYamlScalar(child[2]);
           if (ck === "sheet_row") meta.sheet_row = Number(cv) || undefined;
           else if (ck === "last_sync") meta.last_sync = cv || undefined;
           else if (ck === "origin")
@@ -195,27 +196,34 @@ export function serializeFrontmatter(fm: TaskFrontmatter): string {
   for (const k of keys) {
     const val = scalarToString(fm[k]);
     if (val === null) continue;
-    lines.push(`${k}: ${val}`);
+    lines.push(`${k}: ${formatYamlScalar(val)}`);
   }
   // Preserve unknown keys in stable order
   const knownKeys = new Set<string>(keys as string[]);
   for (const k of Object.keys(fm)) {
     if (knownKeys.has(k)) continue;
     if (k === "sync_meta") continue;
+    if (!isSafeKey(k)) continue;
     const val = scalarToString(fm[k]);
     if (val === null) continue;
-    lines.push(`${k}: ${val}`);
+    lines.push(`${k}: ${formatYamlScalar(val)}`);
   }
   if (fm.sync_meta) {
     lines.push("sync_meta:");
     if (fm.sync_meta.sheet_row !== undefined)
       lines.push(`  sheet_row: ${fm.sync_meta.sheet_row}`);
     if (fm.sync_meta.last_sync !== undefined)
-      lines.push(`  last_sync: ${fm.sync_meta.last_sync}`);
+      lines.push(`  last_sync: ${formatYamlScalar(fm.sync_meta.last_sync)}`);
     if (fm.sync_meta.origin !== undefined)
       lines.push(`  origin: ${fm.sync_meta.origin}`);
   }
   return lines.join("\n") + "\n";
+}
+
+/** A key that fits on one `key: value` line. */
+function isSafeKey(k: string): boolean {
+  // eslint-disable-next-line no-control-regex -- matching control characters is the point
+  return k.trim() !== "" && !/[\u0000-\u001f\u007f:]/.test(k);
 }
 
 /**

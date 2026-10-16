@@ -8,6 +8,7 @@ import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED } from "../core/vault
 import { searchExcludes } from "../core/settings";
 import { SecretStore } from "../core/secrets";
 import { requireWidgetClaudeCommand } from "../ai/claudeCommandGuard";
+import { requireSafeVaultPath, sanitizeFileTitle } from "../core/safePath";
 import { t } from "../core/i18n";
 
 type Backend = "claude-code" | "api";
@@ -272,11 +273,17 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       const d = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
       const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      const slug = query.replace(/[\\/:*?"<>|\n\r\t]+/g, "_").slice(0, 50).trim() || "memo";
-      const folder = ctx.settings.aiNotesFolder;
-      if (!folder) {
+      const slug = sanitizeFileTitle(query).slice(0, 50).trim() || "memo";
+      if (!ctx.settings.aiNotesFolder) {
         new Notice(t().setFirstNotice(t().aiNotesFolderName));
         ctx.openSettings();
+        return;
+      }
+      let folder: string;
+      try {
+        folder = requireSafeVaultPath(ctx.settings.aiNotesFolder, "");
+      } catch (e) {
+        new Notice((e as Error).message, 8000);
         return;
       }
       if (!ctx.app.vault.getAbstractFileByPath(folder)) {
@@ -286,7 +293,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
           /* ignore */
         }
       }
-      let path = `${folder}/${ymd}_${slug}.md`;
+      let path = requireSafeVaultPath(`${folder}/${ymd}_${slug}.md`, folder);
       let i = 2;
       while (ctx.app.vault.getAbstractFileByPath(path)) {
         path = `${folder}/${ymd}_${slug}_${i}.md`;
