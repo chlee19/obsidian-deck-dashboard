@@ -17,6 +17,7 @@ Deck puts your tasks, calendar and notes on one dashboard, so the moment you ope
 | Task creator | A form that creates a task note with frontmatter | Task notes folder |
 | Counter / KPI | A big number: how many results a Dataview query returns | [Dataview](https://github.com/blacksmithgu/obsidian-dataview) |
 | Dataview query | The result of any Dataview DQL or DataviewJS query | Dataview |
+| Base | A `.base` file (Obsidian Bases), optionally one of its views, shown the same way as `![[file.base]]` in a note | Obsidian 1.9+ with the Bases core plugin on; otherwise the widget says so |
 | Markdown | Free text written in Markdown | — |
 | Note embed | A preview of one note | — |
 | Calendar (iCal) | Events from an iCal (`.ics`) URL, such as a private calendar address | An iCal URL |
