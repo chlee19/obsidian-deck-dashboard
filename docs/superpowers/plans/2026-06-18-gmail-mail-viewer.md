@@ -1,5 +1,7 @@
 # Gmail メールビューワー Implementation Plan
 
+> 2026-06 時点の設計記録。ここに出てくるフォルダ名の既定値は、0.1.0 で設定項目に置き換えた（README の Settings を参照）。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Obsidian の Deck プラグインに、Gmail を「確認・作成・送信(ブラウザ確認)」できるメールクライアントを追加する。
@@ -185,7 +187,7 @@ export const DEFAULT_MAIL_CONFIG: MailConfig = {
   backend: "claude-code",
   claudeCmd: "claude",
   model: "claude-haiku-4-5-20251001",
-  ragFolders: ["議事録", "ナレッジ"],
+  ragFolders: [],
 };
 
 export function mergeMailConfig(stored: Partial<MailConfig> | undefined): MailConfig {
@@ -1788,7 +1790,7 @@ describe("tokenize", () => {
 
 describe("scoreFilename", () => {
   it("パスにトークンが含まれると加点", () => {
-    expect(scoreFilename("議事録/サンプル.md", ["サンプル"])).toBe(1);
+    expect(scoreFilename("Notes/サンプル.md", ["サンプル"])).toBe(1);
     expect(scoreFilename("other.md", ["サンプル"])).toBe(0);
   });
 });
@@ -1834,7 +1836,7 @@ export interface RetrievalOptions {
 }
 
 export const ALWAYS_EXCLUDED = [".obsidian", ".trash", ".claude", "node_modules"];
-export const DEFAULT_EXCLUDES = ["ログ", "アーカイブ", "添付", "inbox/temp"];
+export const DEFAULT_EXCLUDES: string[] = [];
 
 export async function selectCandidates(
   app: App,
@@ -1999,10 +2001,10 @@ describe("buildRagQuery", () => {
 
 describe("buildPrompt", () => {
   it("スレッド・vault背景・指示を含む", () => {
-    const cands: Candidate[] = [{ path: "議事録/サンプル.md", excerpt: "前回は単価で揉めた", score: 9 }];
+    const cands: Candidate[] = [{ path: "Notes/サンプル.md", excerpt: "前回は単価で揉めた", score: 9 }];
     const p = buildPrompt(thread, cands);
     expect(p).toContain("見積もりをお願いします。");
-    expect(p).toContain("議事録/サンプル.md");
+    expect(p).toContain("Notes/サンプル.md");
     expect(p).toContain("前回は単価で揉めた");
     expect(p).toMatch(/要約/);
     expect(p).toMatch(/返信ドラフト/);
@@ -2544,7 +2546,7 @@ import { loadMailConfig, saveMailConfig } from "../core/mailConfig";
 
     new Setting(section)
       .setName("AI返信の参照フォルダ (カンマ区切り)")
-      .setDesc("返信ドラフト生成時に過去背景として参照する vault フォルダ。例: 議事録, ナレッジ")
+      .setDesc("返信ドラフト生成時に過去背景として参照する vault フォルダ。例: Meetings, Notes")
       .addText((t) => {
         t.setValue(cfg.ragFolders.join(", "));
         t.inputEl.style.width = "100%";

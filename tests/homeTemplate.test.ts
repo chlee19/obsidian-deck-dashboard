@@ -106,3 +106,14 @@ describe("homeTemplate", () => {
     }
   });
 });
+
+describe("homeTemplate privacy", () => {
+  it("does not link to notes that only exist in one particular vault", () => {
+    const tpl = getHomeTemplate();
+    for (const [id, w] of Object.entries(tpl.widgets)) {
+      const content = (w.settings as { content?: unknown }).content;
+      if (typeof content !== "string") continue;
+      expect(content, `widget ${id} links to a vault-specific note`).not.toMatch(/\[\[/);
+    }
+  });
+});

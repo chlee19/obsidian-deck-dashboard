@@ -1,5 +1,7 @@
 # Gmail メールビューワー 設計書
 
+> 2026-06 時点の設計記録。ここに出てくるフォルダ名の既定値は、0.1.0 で設定項目に置き換えた（README の Settings を参照）。
+
 - **日付**: 2026-06-18
 - **対象プラグイン**: Deck (obsidian-deck-dashboard)
 - **目的**: Obsidian プラグイン内で「メールを確認・作成・送信」できる Gmail クライアントを追加する
@@ -111,7 +113,7 @@ ui/SyncSettingsTab.ts      変更: Gmail 設定セクション
   3. Claude（`claude -p` または Anthropic API。AISearch と同じ backend 設定を流用）に「スレッド要約」と「vault背景を踏まえた返信ドラフト」を依頼。
   4. 返り値: `{ summary: string; replyDraft: string; sources: string[] }`。
 - **依存**: `adapters/anthropic`（`chat`）, `adapters/claudeCode`（`runClaudeP`）, `vaultRetrieval`。
-- **設定**: backend / claudeCmd / model / RAG対象フォルダ（既定: 議事録, ナレッジ など。設定で変更可）。
+- **設定**: backend / claudeCmd / model / RAG対象フォルダ（既定: 空 = vault 全体。設定で変更可）。
 
 ---
 

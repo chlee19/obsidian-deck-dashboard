@@ -42,9 +42,9 @@ describe("isSyncEnabled", () => {
 
 describe("parseFrontmatter", () => {
   it("parses flat key/value pairs", () => {
-    const raw = "PJT: やっちゃば\n期限: 2026-06-15\n優先度: High";
+    const raw = "PJT: サンプルPJT\n期限: 2026-06-15\n優先度: High";
     const fm = parseFrontmatter(raw);
-    expect(fm.PJT).toBe("やっちゃば");
+    expect(fm.PJT).toBe("サンプルPJT");
     expect(fm.期限).toBe("2026-06-15");
     expect(fm.優先度).toBe("High");
   });
@@ -113,8 +113,8 @@ describe("ownerFromPath", () => {
     expect(ownerFromPath("タスク/詳細/foo.md")).toBeNull();
   });
   it("returns owner segment for nested files", () => {
-    expect(ownerFromPath("タスク/詳細/高木悠人/foo.md")).toBe("高木悠人");
-    expect(ownerFromPath("タスク/詳細/嵯峨/bar.md")).toBe("嵯峨");
+    expect(ownerFromPath("タスク/詳細/alice/foo.md")).toBe("alice");
+    expect(ownerFromPath("タスク/詳細/bob/bar.md")).toBe("bob");
   });
 });
 
@@ -122,26 +122,26 @@ describe("filterByScope", () => {
   const mk = (path: string): TFile => ({ path } as unknown as TFile);
   const files = [
     mk("タスク/詳細/flat-task.md"),
-    mk("タスク/詳細/高木悠人/my-task.md"),
-    mk("タスク/詳細/嵯峨/their-task.md"),
+    mk("タスク/詳細/alice/my-task.md"),
+    mk("タスク/詳細/bob/their-task.md"),
   ];
 
   it("personal scope includes flat + selfOwner folder", () => {
-    const result = filterByScope(files, "personal", "高木悠人").map((f) => f.path);
+    const result = filterByScope(files, "personal", "alice").map((f) => f.path);
     expect(result).toContain("タスク/詳細/flat-task.md");
-    expect(result).toContain("タスク/詳細/高木悠人/my-task.md");
-    expect(result).not.toContain("タスク/詳細/嵯峨/their-task.md");
+    expect(result).toContain("タスク/詳細/alice/my-task.md");
+    expect(result).not.toContain("タスク/詳細/bob/their-task.md");
   });
 
   it("org scope excludes flat AND selfOwner — only other members' tasks", () => {
-    const result = filterByScope(files, "org", "高木悠人").map((f) => f.path);
+    const result = filterByScope(files, "org", "alice").map((f) => f.path);
     expect(result).not.toContain("タスク/詳細/flat-task.md");
-    expect(result).not.toContain("タスク/詳細/高木悠人/my-task.md");
-    expect(result).toContain("タスク/詳細/嵯峨/their-task.md");
+    expect(result).not.toContain("タスク/詳細/alice/my-task.md");
+    expect(result).toContain("タスク/詳細/bob/their-task.md");
   });
 
   it("personal scope excludes other members' tasks", () => {
-    const result = filterByScope(files, "personal", "高木悠人").map((f) => f.path);
-    expect(result).not.toContain("タスク/詳細/嵯峨/their-task.md");
+    const result = filterByScope(files, "personal", "alice").map((f) => f.path);
+    expect(result).not.toContain("タスク/詳細/bob/their-task.md");
   });
 });

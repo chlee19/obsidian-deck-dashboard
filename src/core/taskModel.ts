@@ -46,8 +46,8 @@ export async function listTaskFiles(app: App): Promise<TFile[]> {
 /**
  * Return the owner segment for a task file path.
  * - `タスク/詳細/foo.md` (flat) → null (defaults to "self")
- * - `タスク/詳細/高木悠人/foo.md` → "高木悠人"
- * - `タスク/詳細/嵯峨/foo.md` → "嵯峨"
+ * - `タスク/詳細/alice/foo.md` → "alice"
+ * - `タスク/詳細/bob/foo.md` → "bob"
  */
 export function ownerFromPath(path: string): string | null {
   const stripped = path.startsWith(TASK_DIR + "/") ? path.slice(TASK_DIR.length + 1) : path;

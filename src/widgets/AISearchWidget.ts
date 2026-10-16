@@ -407,7 +407,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       );
     new Setting(container)
       .setName("検索対象フォルダ (カンマ区切り)")
-      .setDesc("空 = vault全体（除外フォルダを除く）。例: 議事録, ナレッジ, 日報")
+      .setDesc("空 = vault全体（除外フォルダを除く）。例: Meetings, Notes")
       .addText((t) => {
         t.setValue(settings.folders.join(", "));
         t.inputEl.addClass("deck-input-full");

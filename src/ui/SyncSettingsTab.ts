@@ -68,7 +68,7 @@ export class SyncSettingsTab extends PluginSettingTab {
       )
       .addText((t) => {
         t.setValue(config.self_owner ?? "");
-        t.inputEl.placeholder = "例: 髙木";
+        t.inputEl.placeholder = "例: yamada";
         t.onChange(async (v) => {
           const next = await sync.getConfig();
           next.self_owner = v.trim() || undefined;
@@ -249,7 +249,7 @@ export class SyncSettingsTab extends PluginSettingTab {
 
     new Setting(section)
       .setName("AI返信の参照フォルダ (カンマ区切り)")
-      .setDesc("返信ドラフト生成時に過去背景として参照する vault フォルダ。例: 議事録, ナレッジ")
+      .setDesc("返信ドラフト生成時に過去背景として参照する vault フォルダ。空 = vault 全体。例: Meetings, Notes")
       .addText((t) => {
         t.setValue(cfg.ragFolders.join(", "));
         t.inputEl.addClass("deck-input-full");

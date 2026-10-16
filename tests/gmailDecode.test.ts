@@ -8,9 +8,9 @@ describe("decodeRfc2047", () => {
   });
 
   it("=?UTF-8?B?..?= (Base64) をデコード", () => {
-    // base64UrlEncode は url-safe だが、日本語の "高木" には + / が出ないので encoded-word として有効
-    const word = `=?UTF-8?B?${Buffer.from("高木", "utf-8").toString("base64")}?=`;
-    expect(decodeRfc2047(word)).toBe("高木");
+    // base64UrlEncode は url-safe だが、日本語の "山田" には + / が出ないので encoded-word として有効
+    const word = `=?UTF-8?B?${Buffer.from("山田", "utf-8").toString("base64")}?=`;
+    expect(decodeRfc2047(word)).toBe("山田");
   });
 
   it("From ヘッダ内の encoded-word + アドレスを処理", () => {

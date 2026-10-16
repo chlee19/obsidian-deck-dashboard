@@ -179,10 +179,6 @@ const STOCK_HOME_TEMPLATE: Dashboard = {
       title: "🔗 クイックリンク / メモ",
       settings: {
         content:
-          "## 主要ノート\n" +
-          "- [[自分について]]\n" +
-          "- [[ONBOARDING]]\n" +
-          "- [[README]]\n\n" +
           "## ダッシュボード操作\n" +
           "- ⚙ で各ウィジェット編集 (入力は自動保存)\n" +
           "- ✎ で並び替え・幅変更モード\n" +

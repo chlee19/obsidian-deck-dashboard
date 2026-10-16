@@ -44,10 +44,10 @@ describe("buildRagQuery", () => {
 
 describe("buildPrompt", () => {
   it("スレッド・vault背景・指示を含む", () => {
-    const cands: Candidate[] = [{ path: "議事録/サンプル.md", excerpt: "前回は単価で揉めた", score: 9 }];
+    const cands: Candidate[] = [{ path: "Notes/サンプル.md", excerpt: "前回は単価で揉めた", score: 9 }];
     const p = buildPrompt(thread, cands);
     expect(p).toContain("見積もりをお願いします。");
-    expect(p).toContain("議事録/サンプル.md");
+    expect(p).toContain("Notes/サンプル.md");
     expect(p).toContain("前回は単価で揉めた");
     expect(p).toMatch(/要約/);
     expect(p).toMatch(/返信ドラフト/);

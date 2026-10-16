@@ -80,8 +80,6 @@ export type SyncConfig = ScopeConfigMap & {
   last_sync?: string;
 };
 
-const DEFAULT_SELF_OWNER = "髙木";
-
 interface PluginDataShape {
   sync_config?: SyncConfig;
 }
@@ -123,7 +121,6 @@ export class SheetsSync {
       delete raw.last_sync;
       await this.saveConfig(raw);
     }
-    if (!raw.self_owner) raw.self_owner = DEFAULT_SELF_OWNER;
     return raw;
   }
 
@@ -215,7 +212,14 @@ export class SheetsSync {
       );
     }
     report.spreadsheetUrl = scopeCfg.spreadsheetUrl;
-    const selfOwner = config.self_owner ?? DEFAULT_SELF_OWNER;
+    const selfOwner = config.self_owner?.trim() ?? "";
+    // The org sheet is "everyone's folders except mine". Without knowing which
+    // folder is mine, the user's own tasks would be pushed to the shared sheet.
+    if (scope === "org" && !selfOwner) {
+      throw new Error(
+        "self_owner が未設定です。設定 → Deck で自分のフォルダ名を入れてから組織シートを同期してください。"
+      );
+    }
 
     // 1. Backfill missing task_ids
     const newIds = await backfillTaskIds(this.app);
