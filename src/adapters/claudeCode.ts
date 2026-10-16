@@ -14,12 +14,12 @@ type NodeBytes = Buffer;
  * Sends the prompt via stdin to avoid arg length limits.
  *
  * @param prompt full prompt text
- * @param claudeCmd command name or absolute path (default: "claude")
+ * @param claudeCmd validated command from Settings → Deck (see ai/claudeCommandGuard)
  * @param extraArgs e.g. ["--output-format", "text"]
  */
 export async function runClaudeP(
   prompt: string,
-  claudeCmd = "claude",
+  claudeCmd: string,
   extraArgs: string[] = []
 ): Promise<ClaudeCodeResponse> {
   if (!Platform.isDesktop) {

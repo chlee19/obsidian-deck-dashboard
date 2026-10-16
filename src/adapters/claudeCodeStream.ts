@@ -67,7 +67,8 @@ interface StreamJsonEvent {
 export function runClaudeStream(opts: {
   prompt: string;
   cwd: string;
-  claudeCmd?: string;
+  /** Validated command from Settings → Deck (see ai/claudeCommandGuard). */
+  claudeCmd: string;
   permissionMode?: "acceptEdits" | "bypassPermissions" | "default";
   onEvent: (e: StreamEvent) => void;
   timeoutMs?: number;
@@ -78,7 +79,7 @@ export function runClaudeStream(opts: {
   const {
     prompt,
     cwd,
-    claudeCmd = "claude",
+    claudeCmd,
     permissionMode = "acceptEdits",
     onEvent,
     timeoutMs = 30 * 60_000,

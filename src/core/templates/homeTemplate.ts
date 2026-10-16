@@ -83,7 +83,6 @@ function buildStockHomeTemplate(s: Strings): Dashboard {
         title: s.tplAiSearch,
         settings: {
           backend: "claude-code",
-          claudeCmd: "claude",
           model: "claude-haiku-4-5-20251001",
           topK: 30,
           excerptChars: 300,

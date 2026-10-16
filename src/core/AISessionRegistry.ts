@@ -54,7 +54,8 @@ export interface StartOptions {
   vaultRoot: string;
   permissionMode: "acceptEdits" | "bypassPermissions";
   prompt: string;
-  claudeCmd?: string;
+  /** Validated command from Settings → Deck (see ai/claudeCommandGuard). */
+  claudeCmd: string;
   /** Folder for the run log (Settings → Deck → AI delegation logs). */
   logFolder: string;
   /** Called once the session is finalized (after writer.finalize). */
@@ -187,7 +188,7 @@ export class AISessionRegistry {
     const session = runClaudeStream({
       prompt: opts.prompt,
       cwd: opts.vaultRoot,
-      claudeCmd: opts.claudeCmd ?? "claude",
+      claudeCmd: opts.claudeCmd,
       permissionMode: opts.permissionMode,
       onEvent,
     });

@@ -9,8 +9,6 @@ export interface MailConfig {
   maxItems: number;
   /** AI バックエンド（AISearch と同じ切替） */
   backend: MailBackend;
-  /** claude コマンド（claude-code バックエンド用） */
-  claudeCmd: string;
   /** Anthropic モデル（api バックエンド用） */
   model: string;
   /** AI返信の過去背景 RAG 対象フォルダ（空=vault全体） */
@@ -21,7 +19,6 @@ export const DEFAULT_MAIL_CONFIG: MailConfig = {
   query: "in:inbox",
   maxItems: 25,
   backend: "claude-code",
-  claudeCmd: "claude",
   model: "claude-haiku-4-5-20251001",
   ragFolders: [],
 };

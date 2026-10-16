@@ -4,15 +4,19 @@ import type { DeckHost, DeckSettings } from "../core/settings";
 import { cleanFolder } from "../core/settings";
 import { t, type Strings } from "../core/i18n";
 import { PathSuggest, type PathKind } from "./PathSuggest";
+import { DEFAULT_CLAUDE_COMMAND, isExecutableFile, validateClaudeCommand } from "../core/claudeCommand";
 
 /** What the settings section needs from the plugin. */
 export interface SettingsSectionHost extends DeckHost {
   saveSettings(): Promise<void>;
 }
 
-type FolderKey = {
-  [K in keyof DeckSettings]: DeckSettings[K] extends string ? K : never;
-}[keyof DeckSettings];
+type FolderKey = Exclude<
+  {
+    [K in keyof DeckSettings]: DeckSettings[K] extends string ? K : never;
+  }[keyof DeckSettings],
+  "claudeCommand"
+>;
 
 interface PathRow {
   key: FolderKey;
@@ -87,6 +91,33 @@ export function renderDeckSettings(containerEl: HTMLElement, app: App, host: Set
         await host.saveSettings();
       });
     });
+
+  renderClaudeCommandSetting(containerEl, host);
+}
+
+/**
+ * The only place the Claude Code command can be set. Dashboard files cannot
+ * override it; the value is checked here as it is typed and again before
+ * every run.
+ */
+function renderClaudeCommandSetting(containerEl: HTMLElement, host: SettingsSectionHost): void {
+  const s = t();
+  new Setting(containerEl).setName(s.settingsAiHeading).setHeading();
+  const setting = new Setting(containerEl).setName(s.claudeCommandName).setDesc(s.claudeCommandDesc);
+  const status = setting.descEl.createDiv({ cls: "mod-warning" });
+  const showStatus = (value: string): void => {
+    const check = validateClaudeCommand(value.trim() || DEFAULT_CLAUDE_COMMAND, isExecutableFile);
+    status.setText(check.ok ? "" : s.claudeCommandRejected(check.reason));
+  };
+  setting.addText((text) => {
+    text.setPlaceholder(DEFAULT_CLAUDE_COMMAND).setValue(host.settings.claudeCommand);
+    showStatus(host.settings.claudeCommand);
+    text.onChange(async (v) => {
+      host.settings.claudeCommand = v.trim();
+      showStatus(v);
+      await host.saveSettings();
+    });
+  });
 }
 
 function addPathSetting(containerEl: HTMLElement, app: App, host: SettingsSectionHost, row: PathRow): void {

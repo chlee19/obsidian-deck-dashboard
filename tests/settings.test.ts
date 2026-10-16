@@ -92,6 +92,28 @@ describe("migratePluginData", () => {
   });
 });
 
+describe("claudeCommand setting", () => {
+  it("defaults to claude for new and upgrading users", () => {
+    expect(migratePluginData(null, noLegacyHome).settings.claudeCommand).toBe("claude");
+    expect(migratePluginData({ auto_sync: true }, noLegacyHome).settings.claudeCommand).toBe("claude");
+  });
+
+  it("carries over the command an upgrading user had saved for mail", () => {
+    const r = migratePluginData({ mail_config: { claudeCmd: "/opt/tools/claude" } }, noLegacyHome);
+    expect(r.settings.claudeCommand).toBe("/opt/tools/claude");
+  });
+
+  it("keeps a stored value and ignores values of the wrong type", () => {
+    expect(
+      migratePluginData({ [SETTINGS_KEY]: { claudeCommand: "/usr/local/bin/claude" } }, noLegacyHome).settings
+        .claudeCommand
+    ).toBe("/usr/local/bin/claude");
+    expect(
+      migratePluginData({ [SETTINGS_KEY]: { claudeCommand: 7 } }, noLegacyHome).settings.claudeCommand
+    ).toBe("claude");
+  });
+});
+
 describe("cleanFolder", () => {
   it("trims spaces and slashes", () => {
     expect(cleanFolder("  /Tasks/Open/ ")).toBe("Tasks/Open");

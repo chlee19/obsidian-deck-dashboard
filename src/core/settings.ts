@@ -24,6 +24,12 @@ export interface DeckSettings {
   /** Always skipped by AI search / AI mail replies. */
   searchExcludeFolders: string[];
   openHomeOnStartup: boolean;
+  /**
+   * Claude Code executable used by AI search, AI mail replies and AI
+   * delegation. Only read from here (this device's data.json), never from
+   * .dashboard files. See core/claudeCommand.ts for what is allowed.
+   */
+  claudeCommand: string;
 }
 
 /** Key in data.json. */
@@ -50,6 +56,7 @@ export const FRESH_SETTINGS: DeckSettings = {
   aiNotesFolder: "",
   searchExcludeFolders: [],
   openHomeOnStartup: false,
+  claudeCommand: "claude",
 };
 
 /**
@@ -68,6 +75,7 @@ export const LEGACY_SETTINGS: DeckSettings = {
   aiNotesFolder: "inbox/temp",
   searchExcludeFolders: ["ログ", "アーカイブ", "添付", "inbox/temp"],
   openHomeOnStartup: false,
+  claudeCommand: "claude",
 };
 
 /** What a plugin exposes to views, widgets and helpers. */
@@ -112,7 +120,7 @@ function cleanFolderList(value: unknown): string[] | null {
   return out;
 }
 
-function pickSettings(stored: PlainObject, defaults: DeckSettings): DeckSettings {
+function pickSettings(stored: PlainObject, defaults: DeckSettings, mail: PlainObject): DeckSettings {
   const str = (key: keyof DeckSettings): string =>
     typeof stored[key] === "string" ? cleanFolder(stored[key]) : (defaults[key] as string);
   const home =
@@ -133,7 +141,15 @@ function pickSettings(stored: PlainObject, defaults: DeckSettings): DeckSettings
       typeof stored.openHomeOnStartup === "boolean"
         ? stored.openHomeOnStartup
         : defaults.openHomeOnStartup,
+    claudeCommand: pickClaudeCommand(stored, mail, defaults),
   };
+}
+
+// Before 0.1.0 the mail settings had their own command; carry it over once.
+function pickClaudeCommand(stored: PlainObject, mail: PlainObject, defaults: DeckSettings): string {
+  if (typeof stored.claudeCommand === "string") return stored.claudeCommand.trim();
+  if (typeof mail.claudeCmd === "string" && mail.claudeCmd.trim()) return mail.claudeCmd.trim();
+  return defaults.claudeCommand;
 }
 
 /**
@@ -152,7 +168,8 @@ export function migratePluginData(
   const storedSettings = input[SETTINGS_KEY];
   const legacy = !isPlainObject(storedSettings) && (isPlainObject(raw) || opts.legacyHomeExists);
   const defaults = legacy ? LEGACY_SETTINGS : FRESH_SETTINGS;
-  const settings = pickSettings(isPlainObject(storedSettings) ? storedSettings : {}, defaults);
+  const mailConfig = isPlainObject(input.mail_config) ? input.mail_config : {};
+  const settings = pickSettings(isPlainObject(storedSettings) ? storedSettings : {}, defaults, mailConfig);
 
   const data: PlainObject = { ...input, [SETTINGS_KEY]: settings };
 

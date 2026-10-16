@@ -7,6 +7,7 @@ import { wireInternalLinks } from "./linkHandler";
 import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED } from "../core/vaultRetrieval";
 import { searchExcludes } from "../core/settings";
 import { SecretStore } from "../core/secrets";
+import { requireWidgetClaudeCommand } from "../ai/claudeCommandGuard";
 import { t } from "../core/i18n";
 
 type Backend = "claude-code" | "api";
@@ -83,7 +84,11 @@ function promptText(
 
 interface Settings {
   backend: Backend;
-  claudeCmd: string;
+  /**
+   * Written by 0.0.x. Never run: the command comes from Settings → Deck only.
+   * Kept in the type so a differing value can be reported to the user.
+   */
+  claudeCmd?: string;
   model: string;
   topK: number;
   excerptChars: number;
@@ -99,7 +104,6 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
     "自然言語クエリ → vault内候補をkeyword pre-filter → Claudeに渡して関連ノートを要約付きで返す。",
   defaultSettings: () => ({
     backend: "claude-code",
-    claudeCmd: "claude",
     model: "claude-haiku-4-5-20251001",
     topK: 30,
     excerptChars: 300,
@@ -194,12 +198,11 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
           // claude -p reads prompt from stdin; combine system+user
           const merged = `${system}\n\n---\n\n${user}`;
           const t0 = Date.now();
-          const cc = await runClaudeP(merged, settings.claudeCmd);
+          const cmd = requireWidgetClaudeCommand(settings, ctx.settings);
+          const cc = await runClaudeP(merged, cmd);
           answerMd = cc.text.trim();
           const ms = Date.now() - t0;
-          meta.setText(
-            `候補 ${candidates.length} 件 / claude -p (${settings.claudeCmd}) / ${ms}ms`
-          );
+          meta.setText(`候補 ${candidates.length} 件 / claude -p (${cmd}) / ${ms}ms`);
         } else {
           const res = await chat(
             apiKey ?? "",
@@ -241,7 +244,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
 
       try {
         const t0 = Date.now();
-        const cc = await runClaudeP(webPrompt, settings.claudeCmd);
+        const cc = await runClaudeP(webPrompt, requireWidgetClaudeCommand(settings, ctx.settings));
         const webMd = cc.text.trim();
         const ms = Date.now() - t0;
         meta.setText(`🌐 Web検索完了 / claude -p (WebSearch) / ${ms}ms`);
@@ -367,21 +370,13 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
   renderSettingsForm(container, settings, onChange) {
     new Setting(container)
       .setName("バックエンド")
-      .setDesc("claude-code = `claude -p` 経由 (Pro/Maxサブスク・APIキー不要・desktop限定) / api = Anthropic API 直叩き")
+      .setDesc("claude-code = `claude -p` 経由 (Pro/Maxサブスク・APIキー不要・desktop限定。コマンドは 設定 → Deck で指定) / api = Anthropic API 直叩き")
       .addDropdown((d) =>
         d
           .addOption("claude-code", "claude -p (subscription)")
           .addOption("api", "Anthropic API (key)")
           .setValue(settings.backend)
           .onChange((v) => onChange({ ...settings, backend: v as Backend }))
-      );
-    new Setting(container)
-      .setName("claude コマンド (claude-code backend用)")
-      .setDesc('PATHに通ってる名前 or 絶対パス。デフォルト "claude"')
-      .addText((t) =>
-        t.setValue(settings.claudeCmd).onChange((v) =>
-          onChange({ ...settings, claudeCmd: v.trim() || "claude" })
-        )
       );
     new Setting(container)
       .setName("モデル (api backendのみ)")

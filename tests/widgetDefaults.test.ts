@@ -48,3 +48,12 @@ describe("home template folders", () => {
     }
   });
 });
+
+describe("command to run", () => {
+  it("is not part of any widget's settings or the home template", () => {
+    for (const def of widgetRegistry.all()) {
+      expect(JSON.stringify(def.defaultSettings()), def.type).not.toContain("claudeCmd");
+    }
+    expect(JSON.stringify(getHomeTemplate())).not.toContain("claudeCmd");
+  });
+});

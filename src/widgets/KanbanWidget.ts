@@ -219,7 +219,7 @@ async function renderKanban(
             app: ctx.app,
             taskFile: f,
             vaultRoot,
-            logFolder: ctx.settings.aiLogFolder,
+            settings: ctx.settings,
             openSettings: ctx.openSettings,
             statusField: settings.statusField,
             successStatus: pickSuccessStatus(settings.columns),

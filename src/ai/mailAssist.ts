@@ -4,6 +4,7 @@ import { runClaudeP } from "../adapters/claudeCode";
 import { selectCandidates, type Candidate } from "../core/vaultRetrieval";
 import { searchExcludes, settingsOf } from "../core/settings";
 import { SecretStore } from "../core/secrets";
+import { requireClaudeCommand } from "./claudeCommandGuard";
 import type { GmailThread } from "../adapters/gmail";
 import type { MailConfig } from "../core/mailConfig";
 
@@ -81,7 +82,7 @@ export async function generateReplyDraft(
 
   let raw: string;
   if (config.backend === "claude-code") {
-    raw = (await runClaudeP(prompt, config.claudeCmd)).text;
+    raw = (await runClaudeP(prompt, requireClaudeCommand(settingsOf(plugin)))).text;
   } else {
     const apiKey = await new SecretStore(plugin).get<string>("anthropic_api_key");
     if (!apiKey) throw new Error("Anthropic API キーが未設定です（設定で backend を claude-code にするか、キーを設定）");

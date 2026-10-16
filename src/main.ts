@@ -147,7 +147,7 @@ export default class DeckPlugin extends Plugin implements DeckHost {
       new AISessionListModal({
         app: this.app,
         vaultRoot: vaultRoot ?? "",
-        logFolder: this.settings.aiLogFolder,
+        settings: this.settings,
         openSettings: () => this.openSettings(),
       }).open();
     });

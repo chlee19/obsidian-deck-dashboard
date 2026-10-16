@@ -59,6 +59,7 @@ Settings → Deck starts with the home dashboard and the folders widgets read. E
 | Sheets sync logs | One line per sync in a daily `.jsonl` file | Not set (no log) |
 | Notes saved from AI search | The "save as note" button of AI search | Not set |
 | Folders excluded from AI search | AI search and AI mail replies | None |
+| Claude Code command | AI search, AI mail replies and AI delegation: `claude` from your PATH, or the absolute path of an executable. Only enter a program you trust | `claude` |
 
 A folder written in a widget's own settings (⚙) wins over these. Folders already written in an existing `.dashboard` file are kept as they are.
 
@@ -113,7 +114,7 @@ Deck does not collect analytics or telemetry. It only connects to a service when
 | Sheets sync | `sheets.googleapis.com/v4` | Creates a spreadsheet and reads/writes the task rows (title, project, owner, due date, status …) |
 | Calendar (iCal) widget | The URL you enter | A GET request for the calendar file |
 | AI search / AI mail reply, API backend | `api.anthropic.com` | Your question (or the mail thread) and short excerpts of the notes picked as candidates, with your Anthropic API key |
-| AI search / AI mail reply / AI delegation, Claude Code backend | Runs the `claude` command on your computer | The same prompt is passed to Claude Code, which talks to Anthropic with your own Claude account. "Web で調べる" asks Claude Code to search the web. |
+| AI search / AI mail reply / AI delegation, Claude Code backend | Runs the `claude` command on your computer (the command set in Settings → Deck; dashboard files cannot change it) | The same prompt is passed to Claude Code, which talks to Anthropic with your own Claude account. "Web で調べる" asks Claude Code to search the web. |
 | AI delegation | Runs `claude` in your vault folder | Claude Code can read and edit files and run commands in the vault, within the permission mode you choose |
 
 Google OAuth uses a client you create yourself in Google Cloud. Requested scopes: `calendar.readonly`, `spreadsheets`, `drive.file`, `gmail.modify`. Google sign-in and Claude Code are available on desktop only.

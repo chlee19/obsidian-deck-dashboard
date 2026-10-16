@@ -1,5 +1,8 @@
 import { moment } from "obsidian";
 
+/** Why a Claude Code command was refused (see core/claudeCommand.ts). */
+export type CommandRejectReason = "empty" | "control-chars" | "not-allowed" | "not-executable";
+
 // UI strings added in 0.1.0 and later. English is the default; Japanese is
 // picked when Obsidian runs in a ja locale. Older UI text that is still
 // hard-coded in Japanese is migrated here gradually.
@@ -36,6 +39,11 @@ export interface Strings {
   aiNotesFolderDesc: string;
   excludeFoldersName: string;
   excludeFoldersDesc: string;
+  settingsAiHeading: string;
+  claudeCommandName: string;
+  claudeCommandDesc: string;
+  claudeCommandRejected: (reason: CommandRejectReason) => string;
+  dashboardCommandIgnored: (value: string) => string;
 
   basesLabel: string;
   basesDescription: string;
@@ -116,6 +124,23 @@ const en: Strings = {
   excludeFoldersName: "Folders excluded from AI search",
   excludeFoldersDesc:
     "Comma separated. Skipped by AI search and AI mail replies, in addition to each widget's own list. The log folders above are always skipped.",
+  settingsAiHeading: "AI",
+  claudeCommandName: "Claude Code command",
+  claudeCommandDesc:
+    "Run by AI search, AI mail replies and AI delegation. Enter claude (found on your PATH) or the absolute path of the claude executable. Only enter a program you trust: it runs on this computer with access to your vault. Dashboard files cannot change this.",
+  claudeCommandRejected: (reason) => {
+    const why =
+      reason === "empty"
+        ? "it is empty"
+        : reason === "control-chars"
+          ? "it contains a line break or NUL character"
+          : reason === "not-executable"
+            ? "no executable file exists at that path"
+            : "only claude or an absolute path to an executable is allowed";
+    return `The Claude Code command in Settings → Deck was not run: ${why}.`;
+  },
+  dashboardCommandIgnored: (value) =>
+    `This dashboard asks to run “${value}”. Deck only runs the Claude Code command from Settings → Deck, so that value was ignored.`,
 
   basesLabel: "Base (.base)",
   basesDescription: "Shows a .base file (Obsidian Bases) inside the dashboard.",
@@ -206,6 +231,23 @@ const ja: Strings = {
   excludeFoldersName: "AI 検索から除くフォルダ",
   excludeFoldersDesc:
     "カンマ区切りで指定します。AI 検索と AI のメール返信で、各ウィジェットの除外リストに加えて読み飛ばします。上のログ用フォルダは常に除きます。",
+  settingsAiHeading: "AI",
+  claudeCommandName: "Claude Code のコマンド",
+  claudeCommandDesc:
+    "AI 検索・AI のメール返信・AI 移譲で起動するコマンドです。claude（PATH から探します）か、claude の実行ファイルの絶対パスを入れてください。この PC 上で vault にアクセスできる状態で動くので、信頼できる実行ファイルだけを指定してください。ダッシュボードのファイルからは変更できません。",
+  claudeCommandRejected: (reason) => {
+    const why =
+      reason === "empty"
+        ? "空です"
+        : reason === "control-chars"
+          ? "改行か NUL 文字が含まれています"
+          : reason === "not-executable"
+            ? "そのパスに実行できるファイルがありません"
+            : "claude か、実行ファイルの絶対パスだけを指定できます";
+    return `設定 → Deck の Claude Code のコマンドを実行しませんでした: ${why}。`;
+  },
+  dashboardCommandIgnored: (value) =>
+    `このダッシュボードには「${value}」を実行する設定が書かれています。Deck は 設定 → Deck の Claude Code のコマンドだけを実行するので、この値は使いませんでした。`,
 
   basesLabel: "Base (.base)",
   basesDescription: ".base ファイル（Obsidian Bases）をダッシュボードの中に表示します。",
