@@ -23,7 +23,7 @@ export const DEFAULT_MAIL_CONFIG: MailConfig = {
   backend: "claude-code",
   claudeCmd: "claude",
   model: "claude-haiku-4-5-20251001",
-  ragFolders: ["議事録", "ナレッジ"],
+  ragFolders: [],
 };
 
 export function mergeMailConfig(stored: Partial<MailConfig> | undefined): MailConfig {

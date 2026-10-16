@@ -3,6 +3,7 @@ import {
   filterByScope,
   generateTaskId,
   isSyncEnabled,
+  listTaskFiles,
   ownerFromPath,
   parseFrontmatter,
   serializeFrontmatter,
@@ -110,38 +111,63 @@ describe("serializeFrontmatter", () => {
 
 describe("ownerFromPath", () => {
   it("returns null for flat task files", () => {
-    expect(ownerFromPath("タスク/詳細/foo.md")).toBeNull();
+    expect(ownerFromPath("Tasks/foo.md", "Tasks")).toBeNull();
   });
   it("returns owner segment for nested files", () => {
-    expect(ownerFromPath("タスク/詳細/alice/foo.md")).toBe("alice");
-    expect(ownerFromPath("タスク/詳細/bob/bar.md")).toBe("bob");
+    expect(ownerFromPath("Tasks/alice/foo.md", "Tasks")).toBe("alice");
+    expect(ownerFromPath("Tasks/bob/bar.md", "Tasks/")).toBe("bob");
+  });
+  it("works with a nested task folder", () => {
+    expect(ownerFromPath("Work/Tasks/alice/foo.md", "Work/Tasks")).toBe("alice");
+    expect(ownerFromPath("Work/Tasks/foo.md", "Work/Tasks")).toBeNull();
+  });
+});
+
+describe("listTaskFiles", () => {
+  const app = {
+    vault: {
+      getMarkdownFiles: () =>
+        [
+          { path: "Tasks/a.md" },
+          { path: "Tasks/alice/b.md" },
+          { path: "Tasksheet.md" },
+          { path: "Notes/c.md" },
+        ] as unknown as TFile[],
+    },
+  };
+  it("lists notes under the configured task folder only", async () => {
+    const files = await listTaskFiles(app as any, "Tasks");
+    expect(files.map((f) => f.path)).toEqual(["Tasks/a.md", "Tasks/alice/b.md"]);
+  });
+  it("lists nothing while the task folder is not set", async () => {
+    expect(await listTaskFiles(app as any, "")).toEqual([]);
   });
 });
 
 describe("filterByScope", () => {
   const mk = (path: string): TFile => ({ path } as unknown as TFile);
   const files = [
-    mk("タスク/詳細/flat-task.md"),
-    mk("タスク/詳細/alice/my-task.md"),
-    mk("タスク/詳細/bob/their-task.md"),
+    mk("Tasks/flat-task.md"),
+    mk("Tasks/alice/my-task.md"),
+    mk("Tasks/bob/their-task.md"),
   ];
 
   it("personal scope includes flat + selfOwner folder", () => {
-    const result = filterByScope(files, "personal", "alice").map((f) => f.path);
-    expect(result).toContain("タスク/詳細/flat-task.md");
-    expect(result).toContain("タスク/詳細/alice/my-task.md");
-    expect(result).not.toContain("タスク/詳細/bob/their-task.md");
+    const result = filterByScope(files, "personal", "alice", "Tasks").map((f) => f.path);
+    expect(result).toContain("Tasks/flat-task.md");
+    expect(result).toContain("Tasks/alice/my-task.md");
+    expect(result).not.toContain("Tasks/bob/their-task.md");
   });
 
   it("org scope excludes flat AND selfOwner — only other members' tasks", () => {
-    const result = filterByScope(files, "org", "alice").map((f) => f.path);
-    expect(result).not.toContain("タスク/詳細/flat-task.md");
-    expect(result).not.toContain("タスク/詳細/alice/my-task.md");
-    expect(result).toContain("タスク/詳細/bob/their-task.md");
+    const result = filterByScope(files, "org", "alice", "Tasks").map((f) => f.path);
+    expect(result).not.toContain("Tasks/flat-task.md");
+    expect(result).not.toContain("Tasks/alice/my-task.md");
+    expect(result).toContain("Tasks/bob/their-task.md");
   });
 
   it("personal scope excludes other members' tasks", () => {
-    const result = filterByScope(files, "personal", "alice").map((f) => f.path);
-    expect(result).not.toContain("タスク/詳細/bob/their-task.md");
+    const result = filterByScope(files, "personal", "alice", "Tasks").map((f) => f.path);
+    expect(result).not.toContain("Tasks/bob/their-task.md");
   });
 });

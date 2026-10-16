@@ -8,6 +8,10 @@ describe("mailConfig", () => {
     expect(DEFAULT_MAIL_CONFIG.maxItems).toBeGreaterThan(0);
   });
 
+  it("既定の RAG 対象は vault 全体（特定の vault のフォルダ名を前提にしない）", () => {
+    expect(DEFAULT_MAIL_CONFIG.ragFolders).toEqual([]);
+  });
+
   it("mergeMailConfig は保存値で既定を上書きしつつ欠損を補完", () => {
     const merged = mergeMailConfig({ maxItems: 10, query: "is:unread" });
     expect(merged.maxItems).toBe(10);

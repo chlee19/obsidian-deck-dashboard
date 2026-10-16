@@ -204,4 +204,10 @@ describe("SheetsSync self owner", () => {
     const sync = new SheetsSync(fakeApp as any, plugin as any, fakeOAuth as any);
     await expect(sync.syncScope("org")).rejects.toThrow(/self_owner/);
   });
+
+  it("refuses to sync until the task folder is set", async () => {
+    const plugin = fakePlugin({ sync_config: { personal: { spreadsheetId: "fake-sheet-id" } } });
+    const sync = new SheetsSync(fakeApp as any, plugin as any, fakeOAuth as any);
+    await expect(sync.syncScope("personal")).rejects.toThrow(/タスクのノート|Task notes/);
+  });
 });

@@ -19,6 +19,8 @@ import {
   writeTask,
 } from "../core/taskModel";
 import type { SyncScope } from "../core/taskModel";
+import { settingsOf } from "../core/settings";
+import { t } from "../core/i18n";
 
 // Re-export so consumers (e.g. SyncSettingsTab) can import SyncScope from here.
 export type { SyncScope };
@@ -104,6 +106,11 @@ export class SheetsSync {
 
   get syncing(): boolean {
     return SheetsSync.isSyncing;
+  }
+
+  /** Task folder from the plugin settings ("" while unset). */
+  private taskFolder(): string {
+    return settingsOf(this.plugin).taskFolder;
   }
 
   async getConfig(): Promise<SyncConfig> {
@@ -221,8 +228,13 @@ export class SheetsSync {
       );
     }
 
+    const taskFolder = this.taskFolder();
+    if (!taskFolder) {
+      throw new Error(t().setFirstNotice(t().taskFolderName));
+    }
+
     // 1. Backfill missing task_ids
-    const newIds = await backfillTaskIds(this.app);
+    const newIds = await backfillTaskIds(this.app, taskFolder);
     if (newIds > 0) new Notice(`task_id を ${newIds} 件付与`);
 
     // 2. Load both sides
@@ -337,13 +349,13 @@ export class SheetsSync {
   }
 
   /**
-   * Collect every task_id present anywhere under タスク/詳細/ (no scope filter).
+   * Collect every task_id present anywhere under the task folder (no scope filter).
    * Used to suppress duplicate md creation when a sheet row's task already
    * lives in a different scope's folder.
    */
   private async loadAllKnownTaskIds(): Promise<Set<string>> {
     const ids = new Set<string>();
-    for (const f of await listTaskFiles(this.app)) {
+    for (const f of await listTaskFiles(this.app, this.taskFolder())) {
       const rec = await readTask(this.app, f);
       const id = rec.frontmatter.task_id;
       if (typeof id === "string" && id.length > 0) ids.add(id);
@@ -352,7 +364,13 @@ export class SheetsSync {
   }
 
   private async loadVaultTasks(scope: SyncScope, selfOwner: string): Promise<TaskRecord[]> {
-    const files = filterByScope(await listTaskFiles(this.app), scope, selfOwner);
+    const taskFolder = this.taskFolder();
+    const files = filterByScope(
+      await listTaskFiles(this.app, taskFolder),
+      scope,
+      selfOwner,
+      taskFolder
+    );
     const out: TaskRecord[] = [];
     for (const f of files) {
       const rec = await readTask(this.app, f);
@@ -398,7 +416,7 @@ export class SheetsSync {
       .join("\n");
     const body = `# ${title}\n\nSheets発のタスク。詳細はSheets側を参照。\n`;
     const safeTitle = title.replace(/[/\\:]/g, "_");
-    const folder = `タスク/詳細/${owner}`;
+    const folder = `${this.taskFolder()}/${owner}`;
     const existing = this.app.vault.getAbstractFileByPath(folder);
     if (!existing) await this.app.vault.createFolder(folder);
     const path = `${folder}/${safeTitle}.md`;
@@ -408,7 +426,8 @@ export class SheetsSync {
 
   private async appendLog(scope: SyncScope, report: SyncReport, now: string): Promise<void> {
     const date = now.slice(0, 10);
-    const dir = "ログ/sync";
+    const dir = settingsOf(this.plugin).syncLogFolder;
+    if (!dir) return; // no log folder configured → keep no log
     try {
       const folder = this.app.vault.getAbstractFileByPath(dir);
       if (!folder) await this.app.vault.createFolder(dir);

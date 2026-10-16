@@ -1,4 +1,5 @@
 import { App, TFile } from "obsidian";
+import { cleanFolder } from "./settings";
 
 export interface TaskFrontmatter {
   task_id?: string;
@@ -30,27 +31,34 @@ export interface TaskRecord {
   lastModified: number;
 }
 
-export const TASK_DIR = "タスク/詳細";
 const FM_RE = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
 
 export type SyncScope = "personal" | "org";
 
-/**
- * List all task detail files in タスク/詳細/ (recursive, all subfolders).
- */
-export async function listTaskFiles(app: App): Promise<TFile[]> {
-  const all = app.vault.getMarkdownFiles();
-  return all.filter((f) => f.path.startsWith(TASK_DIR + "/"));
+function folderPrefix(taskFolder: string): string {
+  const f = cleanFolder(taskFolder);
+  return f ? f + "/" : "";
 }
 
 /**
- * Return the owner segment for a task file path.
- * - `タスク/詳細/foo.md` (flat) → null (defaults to "self")
- * - `タスク/詳細/alice/foo.md` → "alice"
- * - `タスク/詳細/bob/foo.md` → "bob"
+ * List all task detail files under the task folder (recursive). Empty while
+ * the task folder is not configured.
  */
-export function ownerFromPath(path: string): string | null {
-  const stripped = path.startsWith(TASK_DIR + "/") ? path.slice(TASK_DIR.length + 1) : path;
+export async function listTaskFiles(app: App, taskFolder: string): Promise<TFile[]> {
+  const prefix = folderPrefix(taskFolder);
+  if (!prefix) return [];
+  const all = app.vault.getMarkdownFiles();
+  return all.filter((f) => f.path.startsWith(prefix));
+}
+
+/**
+ * Return the owner segment for a task file path, relative to the task folder.
+ * - `Tasks/foo.md` (flat) → null (defaults to "self")
+ * - `Tasks/alice/foo.md` → "alice"
+ */
+export function ownerFromPath(path: string, taskFolder: string): string | null {
+  const prefix = folderPrefix(taskFolder);
+  const stripped = prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path;
   const parts = stripped.split("/");
   if (parts.length < 2) return null; // flat file
   return parts[0];
@@ -69,16 +77,17 @@ export function ownerFromPath(path: string): string | null {
 export function filterByScope(
   files: TFile[],
   scope: SyncScope,
-  selfOwner: string
+  selfOwner: string,
+  taskFolder: string
 ): TFile[] {
   if (scope === "org") {
     return files.filter((f) => {
-      const owner = ownerFromPath(f.path);
+      const owner = ownerFromPath(f.path, taskFolder);
       return owner !== null && owner !== selfOwner;
     });
   }
   return files.filter((f) => {
-    const owner = ownerFromPath(f.path);
+    const owner = ownerFromPath(f.path, taskFolder);
     return owner === null || owner === selfOwner;
   });
 }
@@ -244,8 +253,8 @@ export function isSyncEnabled(fm: TaskFrontmatter): boolean {
 /**
  * Ensure every task md has a task_id. Returns count of newly assigned ids.
  */
-export async function backfillTaskIds(app: App): Promise<number> {
-  const files = await listTaskFiles(app);
+export async function backfillTaskIds(app: App, taskFolder: string): Promise<number> {
+  const files = await listTaskFiles(app, taskFolder);
   let count = 0;
   for (const f of files) {
     const rec = await readTask(app, f);

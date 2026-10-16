@@ -1,7 +1,8 @@
 import type { App, Plugin } from "obsidian";
 import { chat } from "../adapters/anthropic";
 import { runClaudeP } from "../adapters/claudeCode";
-import { selectCandidates, DEFAULT_EXCLUDES, type Candidate } from "../core/vaultRetrieval";
+import { selectCandidates, type Candidate } from "../core/vaultRetrieval";
+import { searchExcludes, settingsOf } from "../core/settings";
 import type { GmailThread } from "../adapters/gmail";
 import type { MailConfig } from "../core/mailConfig";
 
@@ -73,7 +74,7 @@ export async function generateReplyDraft(
     topK: 8,
     excerptChars: 400,
     folders: config.ragFolders,
-    excludeFolders: DEFAULT_EXCLUDES,
+    excludeFolders: searchExcludes(settingsOf(plugin)),
   });
   const prompt = buildPrompt(thread, candidates);
 
