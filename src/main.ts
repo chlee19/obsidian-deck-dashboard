@@ -7,7 +7,7 @@ import {
   VIEW_TYPE_DASHBOARD,
   VIEW_TYPE_MAIL,
 } from "./core/constants";
-import { registerCommands } from "./commands";
+import { openHomeDashboard, registerCommands } from "./commands";
 import { registerBuiltinWidgets } from "./widgets";
 import { getAISessionRegistry } from "./core/AISessionRegistry";
 import { AISessionListModal } from "./ui/AISessionListModal";
@@ -114,6 +114,17 @@ export default class DeckPlugin extends Plugin implements DeckHost {
     // Auto-sync watcher (task folder modifications → debounced Sheets sync)
     const watcher = new AutoSyncWatcher(this, this.app);
     void watcher.install();
+
+    // Settings → Deck → Open the home dashboard on startup (off by default).
+    // onLayoutReady also fires right away when the plugin is enabled later,
+    // so only act during the app's own startup.
+    const atAppStart = !this.app.workspace.layoutReady;
+    this.app.workspace.onLayoutReady(() => {
+      if (!atAppStart || !this.settings.openHomeOnStartup) return;
+      openHomeDashboard(this, { atStartup: true }).catch((e: unknown) => {
+        console.error("Deck: could not open the home dashboard", e);
+      });
+    });
   }
 
   onunload(): void {

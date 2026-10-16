@@ -1,5 +1,6 @@
 import { Modal, Notice, Plugin, TFile, normalizePath } from "obsidian";
-import { DASHBOARD_EXTENSION, VIEW_TYPE_MAIL } from "./core/constants";
+import { DASHBOARD_EXTENSION, VIEW_TYPE_DASHBOARD, VIEW_TYPE_MAIL } from "./core/constants";
+import { findLeafShowingFile, startupLeafMode } from "./core/homeLeaf";
 import { dashboardFolderPath, homeDashboardPath, type DeckHost } from "./core/settings";
 import { t } from "./core/i18n";
 import {
@@ -286,8 +287,24 @@ function homeTemplatePayload(): string {
   return serializeDashboard(getHomeTemplate(s.homeTitle, s));
 }
 
-export async function openHomeDashboard(plugin: CommandHost): Promise<void> {
+/**
+ * Open the home dashboard. If a tab already shows it, switch to that tab.
+ * `atStartup` avoids replacing the note the user had open: it reuses an
+ * empty tab or opens a new one.
+ */
+export async function openHomeDashboard(
+  plugin: CommandHost,
+  opts: { atStartup?: boolean } = {}
+): Promise<void> {
+  const { workspace } = plugin.app;
   const homePath = normalizePath(homeDashboardPath(plugin.settings));
+  const open = findLeafShowingFile(workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD), homePath);
+  if (open) {
+    workspace.setActiveLeaf(open, { focus: true });
+    await workspace.revealLeaf(open);
+    return;
+  }
+
   const existing = plugin.app.vault.getAbstractFileByPath(homePath);
   let file: TFile;
   if (existing instanceof TFile) {
@@ -297,6 +314,14 @@ export async function openHomeDashboard(plugin: CommandHost): Promise<void> {
     if (folder) await ensureFolder(plugin, folder);
     file = await plugin.app.vault.create(homePath, homeTemplatePayload());
     new Notice(`Home dashboard created at ${homePath}`);
+  }
+  if (opts.atStartup) {
+    const recent = workspace.getMostRecentLeaf();
+    const mode = startupLeafMode(recent?.view.getViewType());
+    const leaf = mode === "reuse" && recent ? recent : workspace.getLeaf("tab");
+    await leaf.openFile(file);
+    workspace.setActiveLeaf(leaf, { focus: true });
+    return;
   }
   await openInDashboardView(plugin, file);
 }
