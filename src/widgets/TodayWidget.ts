@@ -1,9 +1,13 @@
-import { Setting, TFile } from "obsidian";
+import { Setting, TFile, moment } from "obsidian";
 import type { WidgetDefinition } from "./types";
+import { readCoreDailyNotes, resolveDailyNote, type DailyFormat } from "../core/dailyNote";
+import { t } from "../core/i18n";
+import { renderFolderNotice } from "./setupNotice";
 
 interface Settings {
+  /** Empty = Settings → Deck, then the core Daily notes plugin. */
   dailyFolder: string;
-  dailyFormat: "YYYY-MM-DD" | "YYYY/MM/DD" | "YYYY/YYYY-MM-DD";
+  dailyFormat: DailyFormat;
   greeting: string;
 }
 
@@ -11,28 +15,13 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-function formatDailyPath(format: Settings["dailyFormat"], folder: string, d: Date): string {
-  const y = d.getFullYear();
-  const m = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  const folderTrim = folder.replace(/\/+$/, "");
-  switch (format) {
-    case "YYYY-MM-DD":
-      return `${folderTrim}/${y}-${m}-${day}.md`;
-    case "YYYY/MM/DD":
-      return `${folderTrim}/${y}/${m}/${y}-${m}-${day}.md`;
-    case "YYYY/YYYY-MM-DD":
-      return `${folderTrim}/${y}/${y}-${m}-${day}.md`;
-  }
-}
-
 export const todayWidget: WidgetDefinition<Settings> = {
   type: "today",
   label: "Today (日付)",
   description: "今日の日付・曜日を大きく表示 + 日報ノートへのクイックリンク。",
   defaultSettings: () => ({
-    dailyFolder: "日報",
-    dailyFormat: "YYYY/YYYY-MM-DD",
+    dailyFolder: "",
+    dailyFormat: "YYYY-MM-DD",
     greeting: "",
   }),
   render(el, settings, ctx) {
@@ -59,7 +48,19 @@ export const todayWidget: WidgetDefinition<Settings> = {
 
     // Daily note link
     const linkRow = wrap.createDiv({ cls: "nd-today-links" });
-    const dailyPath = formatDailyPath(settings.dailyFormat, settings.dailyFolder, now);
+    const target = resolveDailyNote({
+      widgetFolder: settings.dailyFolder,
+      widgetFormat: settings.dailyFormat,
+      settingsFolder: ctx.settings.dailyNotesFolder,
+      core: readCoreDailyNotes(ctx.app),
+      now,
+      formatMoment: (fmt) => moment(now).format(fmt),
+    });
+    if (target.kind === "unset") {
+      renderFolderNotice(linkRow, ctx, t().dailyFolderName);
+      return;
+    }
+    const dailyPath = target.path;
     const existing = ctx.app.vault.getAbstractFileByPath(dailyPath);
     const dailyLink = linkRow.createEl("a", {
       cls: "nd-today-daily-link",
@@ -72,7 +73,7 @@ export const todayWidget: WidgetDefinition<Settings> = {
         if (!(file instanceof TFile)) {
           // create parent folders
           const lastSlash = dailyPath.lastIndexOf("/");
-          const folder = dailyPath.slice(0, lastSlash);
+          const folder = lastSlash > 0 ? dailyPath.slice(0, lastSlash) : ""; // "" = vault root
           if (folder && !ctx.app.vault.getAbstractFileByPath(folder)) {
             await ctx.app.vault.createFolder(folder).catch(() => {});
           }
@@ -98,21 +99,22 @@ export const todayWidget: WidgetDefinition<Settings> = {
       );
     new Setting(container)
       .setName("日報フォルダ")
-      .addText((t) =>
-        t.setValue(settings.dailyFolder).onChange((v) =>
-          onChange({ ...settings, dailyFolder: v.trim() || "日報" })
+      .setDesc(t().inheritFolderHint)
+      .addText((text) =>
+        text.setValue(settings.dailyFolder).onChange((v) =>
+          onChange({ ...settings, dailyFolder: v.trim() })
         )
       );
     new Setting(container)
       .setName("日報ファイルパス形式")
-      .setDesc("vaultの命名規則に合わせる")
+      .setDesc("vaultの命名規則に合わせる（コアのデイリーノートの設定を使うときは、その日付形式が優先されます）")
       .addDropdown((d) =>
         d
-          .addOption("YYYY-MM-DD", "日報/YYYY-MM-DD.md")
-          .addOption("YYYY/MM/DD", "日報/YYYY/MM/YYYY-MM-DD.md")
-          .addOption("YYYY/YYYY-MM-DD", "日報/YYYY/YYYY-MM-DD.md")
+          .addOption("YYYY-MM-DD", "<folder>/YYYY-MM-DD.md")
+          .addOption("YYYY/MM/DD", "<folder>/YYYY/MM/YYYY-MM-DD.md")
+          .addOption("YYYY/YYYY-MM-DD", "<folder>/YYYY/YYYY-MM-DD.md")
           .setValue(settings.dailyFormat)
-          .onChange((v) => onChange({ ...settings, dailyFormat: v as Settings["dailyFormat"] }))
+          .onChange((v) => onChange({ ...settings, dailyFormat: v as DailyFormat }))
       );
   },
 };

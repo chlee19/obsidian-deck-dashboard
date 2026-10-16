@@ -2,6 +2,9 @@ import { Setting, TFile } from "obsidian";
 import type { WidgetDefinition, WidgetContext } from "./types";
 import { parseMarkwhen } from "../adapters/markwhen";
 import { renderMemberTabs } from "./KanbanWidget";
+import { cleanFolder, effectiveFolder } from "../core/settings";
+import { t } from "../core/i18n";
+import { renderFolderNotice, renderSetupNotice } from "./setupNotice";
 
 const ALL_MEMBERS = "";
 
@@ -35,7 +38,7 @@ interface Bar {
   tags: string[];
   done: boolean;
   isGroupHeader: boolean;
-  owner: string; // タスク/詳細/{owner}/foo から抽出（flat or 未割当 = ""）
+  owner: string; // <task folder>/{owner}/foo から抽出（flat or 未割当 = ""）
   onClick?: () => void;
   tooltip?: string;
 }
@@ -81,11 +84,11 @@ export const ganttWidget: WidgetDefinition<Settings> = {
   type: "gantt",
   label: "Gantt",
   description:
-    "ガントチャート。タスク/ガント.mw (Markwhen) かタスクfrontmatter (期限+工数) から自動生成。ズーム&期間シフト対応。",
+    "ガントチャート。タスクの frontmatter (期限+工数) か Markwhen (.mw) ファイルから自動生成。ズーム&期間シフト対応。",
   defaultSettings: () => ({
-    source: "markwhen",
-    markwhenPath: "タスク/ガント.mw",
-    folder: "タスク/詳細",
+    source: "frontmatter",
+    markwhenPath: "",
+    folder: "",
     deadlineField: "期限",
     startField: "開始",
     durationField: "工数",
@@ -100,7 +103,19 @@ export const ganttWidget: WidgetDefinition<Settings> = {
     hideCompleted: false,
   }),
   async render(el, settings, ctx) {
-    await renderGantt(el, settings, ctx);
+    const folder = effectiveFolder(settings.folder, ctx.settings.taskFolder);
+    const markwhenPath = cleanFolder(settings.markwhenPath) || cleanFolder(ctx.settings.markwhenFile);
+    if (settings.source === "markwhen" && !markwhenPath) {
+      el.empty();
+      renderSetupNotice(el, ctx, t().fileNotSet(t().markwhenFileName));
+      return;
+    }
+    if (settings.source !== "markwhen" && !folder) {
+      el.empty();
+      renderFolderNotice(el, ctx, t().taskFolderName);
+      return;
+    }
+    await renderGantt(el, { ...settings, folder, markwhenPath }, ctx);
   },
   renderSettingsForm(container, settings, onChange) {
     new Setting(container)
@@ -114,18 +129,17 @@ export const ganttWidget: WidgetDefinition<Settings> = {
       );
     new Setting(container)
       .setName("Markwhen ファイルパス")
-      .setDesc('例: "タスク/ガント.mw"')
-      .addText((t) =>
-        t.setValue(settings.markwhenPath).onChange((v) =>
+      .setDesc(`例: "Projects/plan.mw"。空なら 設定 → Deck の Markwhen ファイルを使います。`)
+      .addText((text) =>
+        text.setValue(settings.markwhenPath).onChange((v) =>
           onChange({ ...settings, markwhenPath: v.trim() })
         )
       );
     new Setting(container)
       .setName("(frontmatter) ソースフォルダ")
-      .addText((t) =>
-        t.setValue(settings.folder).onChange((v) =>
-          onChange({ ...settings, folder: v.trim() || "タスク/詳細" })
-        )
+      .setDesc(t().inheritFolderHint)
+      .addText((text) =>
+        text.setValue(settings.folder).onChange((v) => onChange({ ...settings, folder: v.trim() }))
       );
     new Setting(container)
       .setName("(frontmatter) 期限フィールド")

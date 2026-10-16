@@ -9,13 +9,17 @@ import {
 import type { Dashboard, LayoutItem, WidgetInstance } from "./types";
 import { widgetRegistry } from "../widgets";
 import { AddWidgetModal, EditWidgetModal } from "../ui/AddWidgetModal";
+import type { DeckHost } from "./settings";
+
+/** The plugin as seen by a dashboard view. */
+export type DashboardHost = Plugin & DeckHost;
 
 export class DashboardView extends TextFileView {
   private dashboard: Dashboard = createDefaultDashboard("Untitled");
   private editMode = false;
-  private plugin: Plugin;
+  private plugin: DashboardHost;
 
-  constructor(leaf: WorkspaceLeaf, plugin: Plugin) {
+  constructor(leaf: WorkspaceLeaf, plugin: DashboardHost) {
     super(leaf);
     this.plugin = plugin;
   }
@@ -59,6 +63,11 @@ export class DashboardView extends TextFileView {
 
   async onClose(): Promise<void> {
     this.containerEl.children[1].empty();
+  }
+
+  /** Re-render every widget (e.g. after Settings → Deck changed). */
+  refresh(): void {
+    this.render();
   }
 
   toggleEditMode(): void {
@@ -267,6 +276,8 @@ export class DashboardView extends TextFileView {
         plugin: this.plugin,
         parent: this,
         sourcePath,
+        settings: this.plugin.settings,
+        openSettings: () => this.plugin.openSettings(),
       })
     ).catch((e) => {
       body.createEl("pre", { cls: "nd-error", text: `Render error: ${(e as Error).message}` });

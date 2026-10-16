@@ -38,7 +38,7 @@ vi.mock("../src/adapters/aiLogWriter", () => {
   return {
     AILogWriter: {
       create: vi.fn(async (_app: any, basename: string) => ({
-        path: `ログ/AI移譲/test_${basename}.md`,
+        path: `Logs/AI/test_${basename}.md`,
         init: vi.fn(async () => undefined),
         logEvent: vi.fn(async () => undefined),
         finalize: vi.fn(async () => undefined),
@@ -91,6 +91,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "do thing",
     });
@@ -109,6 +110,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -131,6 +133,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -154,6 +157,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
       onFinalize,
@@ -182,6 +186,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -198,6 +203,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -206,6 +212,7 @@ describe("AISessionRegistry", () => {
         app,
         taskFile: file,
         vaultRoot: "/tmp/vault",
+        logFolder: "Logs/AI",
         permissionMode: "acceptEdits",
         prompt: "p",
       })
@@ -219,6 +226,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
     });
@@ -240,6 +248,7 @@ describe("AISessionRegistry", () => {
       app,
       taskFile: file,
       vaultRoot: "/tmp/vault",
+      logFolder: "Logs/AI",
       permissionMode: "acceptEdits",
       prompt: "p",
     });

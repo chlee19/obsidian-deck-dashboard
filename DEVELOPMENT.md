@@ -3,8 +3,8 @@
 ## Setup
 
 ```bash
-git clone <this-repo> ~/Develop/obsidian-deck-dashboard
-cd ~/Develop/obsidian-deck-dashboard
+git clone <this-repo> obsidian-deck-dashboard
+cd obsidian-deck-dashboard
 npm install
 ```
 
@@ -40,22 +40,28 @@ npm run test:watch # watch
 
 ## Home dashboard template
 
-`src/core/templates/homeTemplate.ts` holds the canonical layout used when:
+`src/core/templates/homeTemplate.ts` builds the canonical layout used when:
 
-- the **Open home dashboard** command is invoked and no `ホーム.dashboard` file exists yet, or
+- the **Open home dashboard** command is invoked and the home dashboard file
+  (Settings → Deck → Home dashboard file) does not exist yet, or
 - the **Reset home dashboard to template** command is invoked (overwrites the
   existing home dashboard after a confirmation modal).
 
 ### Updating the stock layout
 
 1. Rearrange your home dashboard inside Obsidian (edit mode → drag/resize).
-2. Open the resulting `<vault>/ダッシュボード/ホーム.dashboard` JSON.
-3. Mirror the `layout` and `widgets` blocks into `STOCK_HOME_TEMPLATE`. Keep
+2. Open the resulting `.dashboard` JSON.
+3. Mirror the `layout` and `widgets` blocks into `buildStockHomeTemplate`. Keep
    widget IDs semantic (`kanban`, `gantt`, `ai-search`) — replace auto-generated
    `w_xxxx_NN` IDs that Obsidian assigns to manually-added widgets so the
    template stays readable and diff-friendly.
-4. `npm test` — `homeTemplate.test.ts` enforces layout/widget ID parity, the
-   absence of `w_*` placeholders, and that every widget `type` is registered.
+4. Never write a folder of your own vault into the template. Leave widget
+   `folder` fields empty and use `{{taskFolder}}` / `{{meetingFolder}}` /
+   `{{dailyFolder}}` in Dataview queries; titles and labels come from
+   `src/core/i18n.ts`.
+5. `npm test` — `homeTemplate.test.ts` and `widgetDefaults.test.ts` enforce
+   layout/widget ID parity, the absence of `w_*` placeholders, registered widget
+   types, and that no hard-coded folder sneaks back in.
 
 ### Swapping the template at runtime
 
@@ -65,7 +71,8 @@ command) can plug into the same hook without touching `commands.ts`.
 
 ## Google Sheets Sync (task management)
 
-Bidirectional sync between `タスク/詳細/*.md` frontmatter and a Google Sheet.
+Bidirectional sync between the frontmatter of notes in the task folder
+(Settings → Deck → Task notes) and a Google Sheet.
 
 ### Commands
 
@@ -85,7 +92,8 @@ Bidirectional sync between `タスク/詳細/*.md` frontmatter and a Google Shee
 | System | task_id / vault_link / last_updated / origin |
 
 On conflict (both sides modified after the last sync), ownership rules still
-decide the merged value; the event is logged to `ログ/sync/{date}.jsonl`.
+decide the merged value. When Settings → Deck → Sheets sync logs is set, each
+sync appends one line to `<that folder>/{date}.jsonl`.
 
 ### Opt out
 

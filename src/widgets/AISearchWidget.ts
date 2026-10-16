@@ -4,7 +4,9 @@ import type { WidgetDefinition } from "./types";
 import { chat } from "../adapters/anthropic";
 import { runClaudeP } from "../adapters/claudeCode";
 import { wireInternalLinks } from "./linkHandler";
-import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED, DEFAULT_EXCLUDES } from "../core/vaultRetrieval";
+import { selectCandidates as sharedSelect, ALWAYS_EXCLUDED } from "../core/vaultRetrieval";
+import { searchExcludes } from "../core/settings";
+import { t } from "../core/i18n";
 
 type Backend = "claude-code" | "api";
 
@@ -85,7 +87,7 @@ interface Settings {
   topK: number;
   excerptChars: number;
   folders: string[]; // empty = whole vault (minus excludes)
-  excludeFolders: string[]; // always skipped, even when folders is empty
+  excludeFolders: string[]; // skipped on top of Settings → Deck's exclude list
 }
 
 
@@ -105,7 +107,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
     topK: 30,
     excerptChars: 300,
     folders: [],
-    excludeFolders: [...DEFAULT_EXCLUDES],
+    excludeFolders: [],
   }),
   async render(el, settings, ctx) {
     el.empty();
@@ -169,7 +171,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
         topK: settings.topK,
         excerptChars: settings.excerptChars,
         folders: settings.folders,
-        excludeFolders: settings.excludeFolders ?? DEFAULT_EXCLUDES,
+        excludeFolders: searchExcludes(ctx.settings, settings.excludeFolders ?? []),
       });
       meta.setText(`候補 ${candidates.length} 件 / Claude 問い合わせ中…`);
 
@@ -273,7 +275,12 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       const pad = (n: number) => String(n).padStart(2, "0");
       const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       const slug = query.replace(/[\\/:*?"<>|\n\r\t]+/g, "_").slice(0, 50).trim() || "memo";
-      const folder = "inbox/temp";
+      const folder = ctx.settings.aiNotesFolder;
+      if (!folder) {
+        new Notice(t().setFirstNotice(t().aiNotesFolderName));
+        ctx.openSettings();
+        return;
+      }
       if (!ctx.app.vault.getAbstractFileByPath(folder)) {
         try {
           await ctx.app.vault.createFolder(folder);
@@ -324,7 +331,7 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       }
 
       const saveBtn = actions.createEl("button", {
-        text: "📚 ナレッジ化 (inbox/temp)",
+        text: ctx.settings.aiNotesFolder ? `📚 ナレッジ化 (${ctx.settings.aiNotesFolder})` : "📚 ナレッジ化",
         cls: isWebResult ? "mod-cta" : "",
       });
       saveBtn.addEventListener("click", () =>
@@ -421,11 +428,11 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
     new Setting(container)
       .setName("除外フォルダ (カンマ区切り)")
       .setDesc(
-        `常に検索対象から外す。デフォルト: ${DEFAULT_EXCLUDES.join(", ")}。` +
+        "設定 → Deck の除外フォルダに加えて、検索対象から外す。" +
         `${ALWAYS_EXCLUDED.join(", ")} は強制除外`
       )
       .addText((t) => {
-        t.setValue((settings.excludeFolders ?? DEFAULT_EXCLUDES).join(", "));
+        t.setValue((settings.excludeFolders ?? []).join(", "));
         t.inputEl.addClass("deck-input-full");
         t.onChange((v) =>
           onChange({

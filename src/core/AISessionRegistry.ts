@@ -55,6 +55,8 @@ export interface StartOptions {
   permissionMode: "acceptEdits" | "bypassPermissions";
   prompt: string;
   claudeCmd?: string;
+  /** Folder for the run log (Settings → Deck → AI delegation logs). */
+  logFolder: string;
   /** Called once the session is finalized (after writer.finalize). */
   onFinalize?: (entry: SessionEntry, final: SessionFinal) => void | Promise<void>;
 }
@@ -141,7 +143,7 @@ export class AISessionRegistry {
       this.entries.delete(id);
     }
 
-    const writer = await AILogWriter.create(opts.app, opts.taskFile.basename);
+    const writer = await AILogWriter.create(opts.app, opts.taskFile.basename, opts.logFolder);
     await writer.init({
       taskPath: opts.taskFile.path,
       permissionMode: opts.permissionMode,

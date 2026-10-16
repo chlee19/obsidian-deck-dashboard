@@ -1,5 +1,8 @@
 import { Setting, TFile } from "obsidian";
 import type { WidgetDefinition, WidgetContext } from "./types";
+import { effectiveFolder } from "../core/settings";
+import { t } from "../core/i18n";
+import { renderFolderNotice } from "./setupNotice";
 
 type ChartType =
   | "tasks-completed-30d"
@@ -47,19 +50,25 @@ export const chartsWidget: WidgetDefinition<Settings> = {
     "完了タスク・ノート作成数・PJT別の集計をSVGミニグラフで表示。Chart libraryなしの軽量実装。",
   defaultSettings: () => ({
     charts: ["tasks-completed-30d", "tasks-by-pjt", "tasks-by-status"],
-    folder: "タスク/詳細",
+    folder: "",
     statusField: "status",
     pjtField: "PJT",
   }),
   async render(el, settings, ctx) {
     el.empty();
     el.addClass("nd-widget-charts");
+    const folder = effectiveFolder(settings.folder, ctx.settings.taskFolder);
+    const resolved = { ...settings, folder };
     for (const c of settings.charts) {
       const block = el.createDiv({ cls: "nd-chart-block" });
       block.createDiv({ cls: "nd-chart-title", text: CHART_LABELS[c] });
       const body = block.createDiv({ cls: "nd-chart-body" });
+      if (!folder && c !== "notes-created-30d") {
+        renderFolderNotice(body, ctx, t().taskFolderName);
+        continue;
+      }
       try {
-        await renderChart(body, c, settings, ctx);
+        await renderChart(body, c, resolved, ctx);
       } catch (e) {
         body.createEl("pre", { cls: "nd-error", text: `chart error: ${(e as Error).message}` });
       }
@@ -79,11 +88,12 @@ export const chartsWidget: WidgetDefinition<Settings> = {
           })
         );
       });
-    new Setting(container).setName("タスクフォルダ").addText((t) =>
-      t.setValue(settings.folder).onChange((v) =>
-        onChange({ ...settings, folder: v.trim() || "タスク/詳細" })
-      )
-    );
+    new Setting(container)
+      .setName("タスクフォルダ")
+      .setDesc(t().inheritFolderHint)
+      .addText((text) =>
+        text.setValue(settings.folder).onChange((v) => onChange({ ...settings, folder: v.trim() }))
+      );
     new Setting(container).setName("status フィールド").addText((t) =>
       t.setValue(settings.statusField).onChange((v) =>
         onChange({ ...settings, statusField: v.trim() || "status" })

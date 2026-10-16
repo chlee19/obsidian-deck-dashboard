@@ -1,8 +1,8 @@
 import { App, Notice, Plugin, TAbstractFile, TFile } from "obsidian";
 import { GoogleOAuth } from "../auth/googleOAuth";
 import { SheetsSync } from "./sheetsSync";
+import { settingsOf } from "../core/settings";
 
-const TASK_DIR = "タスク/詳細";
 const DEBOUNCE_MS = 2000;
 const SETTLE_AFTER_SYNC_MS = 2000;
 
@@ -11,7 +11,7 @@ interface AutoSyncSettings {
 }
 
 /**
- * Watches the vault for changes to `タスク/詳細/*.md` and triggers a debounced
+ * Watches the vault for changes under the task folder and triggers a debounced
  * bidirectional sync. Suppresses re-fire while a sync is in progress (and for
  * a short tail afterwards to ignore the writes the sync itself caused).
  */
@@ -47,7 +47,8 @@ export class AutoSyncWatcher {
 
   private onModify(file: TAbstractFile): void {
     if (!(file instanceof TFile)) return;
-    if (!file.path.startsWith(TASK_DIR + "/")) return;
+    const taskFolder = settingsOf(this.plugin).taskFolder;
+    if (!taskFolder || !file.path.startsWith(taskFolder + "/")) return;
     if (SheetsSync.isSyncing) {
       // Don't drop — queue it. Flush will re-fire after current sync ends.
       this.pendingPaths.add(file.path);

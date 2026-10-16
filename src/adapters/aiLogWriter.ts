@@ -8,9 +8,13 @@ import type { StreamEvent } from "./claudeCodeStream";
 export class AILogWriter {
   private constructor(public app: App, public path: string) {}
 
-  static async create(app: App, taskBasename: string): Promise<AILogWriter> {
+  /** @param logFolder Settings → Deck → AI delegation logs (must be set). */
+  static async create(app: App, taskBasename: string, logFolder: string): Promise<AILogWriter> {
+    if (!logFolder.trim()) {
+      throw new Error("AI delegation log folder is not set (Settings → Deck).");
+    }
     const ts = formatStamp(new Date());
-    const folder = normalizePath("ログ/AI移譲");
+    const folder = normalizePath(logFolder);
     await ensureFolder(app, folder);
     const path = `${folder}/${ts}_${safeName(taskBasename)}.md`;
     return new AILogWriter(app, path);

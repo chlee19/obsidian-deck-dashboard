@@ -9,6 +9,9 @@ import { AIDelegationModal } from "./AIDelegationModal";
 export interface AISessionListOptions {
   app: App;
   vaultRoot: string;
+  /** Passed on when a session is reopened (Settings → Deck → AI delegation logs). */
+  logFolder: string;
+  openSettings?: () => void;
   registry?: AISessionRegistry;
 }
 
@@ -18,7 +21,7 @@ export class AISessionListModal extends Modal {
   private vaultRoot: string;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(opts: AISessionListOptions) {
+  constructor(private readonly opts: AISessionListOptions) {
     super(opts.app);
     this.registry = opts.registry ?? getAISessionRegistry();
     this.vaultRoot = opts.vaultRoot;
@@ -111,6 +114,8 @@ export class AISessionListModal extends Modal {
       app: this.app,
       taskFile: f,
       vaultRoot: this.vaultRoot,
+      logFolder: this.opts.logFolder,
+      openSettings: this.opts.openSettings,
       registry: this.registry,
     }).open();
     this.close();

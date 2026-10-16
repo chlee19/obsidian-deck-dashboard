@@ -1,5 +1,8 @@
 import { Notice, Setting, normalizePath } from "obsidian";
 import type { WidgetDefinition, WidgetContext } from "./types";
+import { effectiveFolder } from "../core/settings";
+import { t } from "../core/i18n";
+import { renderFolderNotice } from "./setupNotice";
 
 interface Settings {
   folder: string;
@@ -15,7 +18,7 @@ export const taskCreatorWidget: WidgetDefinition<Settings> = {
   label: "Task Creator (新規タスク追加)",
   description: "フォームから frontmatter付きタスクノートを作成する。Kanban/Ganttに即反映。",
   defaultSettings: () => ({
-    folder: "タスク/詳細",
+    folder: "",
     defaultPjt: "",
     defaultPriority: "Medium",
     defaultStatus: "未着手",
@@ -25,14 +28,20 @@ export const taskCreatorWidget: WidgetDefinition<Settings> = {
   async render(el, settings, ctx) {
     el.empty();
     el.addClass("nd-widget-task-creator");
-    renderForm(el, settings, ctx);
+    const folder = effectiveFolder(settings.folder, ctx.settings.taskFolder);
+    if (!folder) {
+      renderFolderNotice(el, ctx, t().taskFolderName);
+      return;
+    }
+    renderForm(el, { ...settings, folder }, ctx);
   },
   renderSettingsForm(container, settings, onChange) {
-    new Setting(container).setName("保存先フォルダ").addText((t) =>
-      t.setValue(settings.folder).onChange((v) =>
-        onChange({ ...settings, folder: v.trim() || "タスク/詳細" })
-      )
-    );
+    new Setting(container)
+      .setName("保存先フォルダ")
+      .setDesc(t().inheritFolderHint)
+      .addText((text) =>
+        text.setValue(settings.folder).onChange((v) => onChange({ ...settings, folder: v.trim() }))
+      );
     new Setting(container).setName("デフォルト PJT").addText((t) =>
       t.setValue(settings.defaultPjt).onChange((v) => onChange({ ...settings, defaultPjt: v }))
     );

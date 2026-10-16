@@ -1,6 +1,8 @@
 import { Setting } from "obsidian";
 import type { WidgetDefinition } from "./types";
 import { getDataviewApi } from "../adapters/dataview";
+import { renderTokenNotice } from "./tokenNotice";
+import { expandFolderTokens } from "../core/pathTokens";
 
 interface Settings {
   query: string;
@@ -13,7 +15,7 @@ export const counterWidget: WidgetDefinition<Settings> = {
   label: "Counter / KPI",
   description: "Dataviewクエリの結果件数を大きな数字で表示する。",
   defaultSettings: () => ({
-    query: 'LIST FROM "タスク/詳細" WHERE status != "完了"',
+    query: 'LIST FROM "{{taskFolder}}" WHERE status != "完了"',
     label: "未完了タスク",
     unit: "件",
   }),
@@ -25,9 +27,14 @@ export const counterWidget: WidgetDefinition<Settings> = {
       el.createEl("p", { cls: "nd-empty", text: "Dataview プラグインが必要です。" });
       return;
     }
+    const expanded = expandFolderTokens(settings.query, ctx.settings);
+    if (!expanded.ok) {
+      renderTokenNotice(el, ctx, expanded.missing);
+      return;
+    }
     let count: number | string = "?";
     try {
-      const res = await dv.tryQuery(settings.query);
+      const res = await dv.tryQuery(expanded.query);
       if (res?.values?.length !== undefined) {
         count = res.values.length;
       } else if (Array.isArray(res?.rows)) {
@@ -55,7 +62,7 @@ export const counterWidget: WidgetDefinition<Settings> = {
       .addText((t) => t.setValue(settings.unit).onChange((v) => onChange({ ...settings, unit: v })));
     new Setting(container)
       .setName("Dataview LIST クエリ")
-      .setDesc("結果の件数をカウントする。例: LIST FROM \"タスク/詳細\" WHERE status != \"完了\"")
+      .setDesc("結果の件数をカウントする。例: LIST FROM \"{{taskFolder}}\" WHERE status != \"完了\"。{{taskFolder}} / {{meetingFolder}} / {{dailyFolder}} は 設定 → Deck のフォルダに置き換わります")
       .addTextArea((t) => {
         t.setValue(settings.query);
         t.inputEl.rows = 4;

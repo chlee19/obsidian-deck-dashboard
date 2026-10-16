@@ -1,10 +1,7 @@
 import { Modal, Notice, Plugin, TFile, normalizePath } from "obsidian";
-import {
-  DASHBOARD_EXTENSION,
-  DEFAULT_DASHBOARD_FOLDER,
-  DEFAULT_HOME_FILENAME,
-  VIEW_TYPE_MAIL,
-} from "./core/constants";
+import { DASHBOARD_EXTENSION, VIEW_TYPE_MAIL } from "./core/constants";
+import { dashboardFolderPath, homeDashboardPath, type DeckHost } from "./core/settings";
+import { t } from "./core/i18n";
 import {
   createDefaultDashboard,
   serializeDashboard,
@@ -18,7 +15,10 @@ import { listCalendars } from "./adapters/googleCalendar";
 import { SheetsSync } from "./sync/sheetsSync";
 import { AutoSyncWatcher } from "./sync/autoSyncWatcher";
 
-export function registerCommands(plugin: Plugin): void {
+/** The plugin as seen by the commands. */
+export type CommandHost = Plugin & DeckHost;
+
+export function registerCommands(plugin: CommandHost): void {
   plugin.addCommand({
     id: "create-new",
     name: "Create new dashboard",
@@ -248,18 +248,16 @@ function activeDashboardView(plugin: Plugin): DashboardView | null {
 }
 
 async function createNewDashboard(
-  plugin: Plugin,
+  plugin: CommandHost,
   baseTitle: string,
   initial: Dashboard
 ): Promise<TFile> {
-  const folder = normalizePath(DEFAULT_DASHBOARD_FOLDER);
-  if (!plugin.app.vault.getAbstractFileByPath(folder)) {
-    await plugin.app.vault.createFolder(folder);
-  }
+  const folder = dashboardFolderPath(plugin.settings);
+  if (folder) await ensureFolder(plugin, folder);
   const baseName = sanitizeFilename(baseTitle);
   const path = await uniquePath(
     plugin,
-    `${folder}/${baseName}.${DASHBOARD_EXTENSION}`
+    normalizePath(`${folder ? folder + "/" : ""}${baseName}.${DASHBOARD_EXTENSION}`)
   );
   const file = await plugin.app.vault.create(path, serializeDashboard(initial));
   await openInDashboardView(plugin, file);
@@ -267,29 +265,44 @@ async function createNewDashboard(
   return file;
 }
 
-async function openHomeDashboard(plugin: Plugin): Promise<void> {
-  const folder = normalizePath(DEFAULT_DASHBOARD_FOLDER);
-  const homePath = `${folder}/${DEFAULT_HOME_FILENAME}.${DASHBOARD_EXTENSION}`;
+/** Create every missing folder along `path` ("a/b/c"). */
+async function ensureFolder(plugin: Plugin, path: string): Promise<void> {
+  let acc = "";
+  for (const part of path.split("/").filter(Boolean)) {
+    acc = acc ? `${acc}/${part}` : part;
+    if (!plugin.app.vault.getAbstractFileByPath(acc)) {
+      await plugin.app.vault.createFolder(acc);
+    }
+  }
+}
+
+function parentFolder(path: string): string {
+  const i = path.lastIndexOf("/");
+  return i > 0 ? path.slice(0, i) : "";
+}
+
+function homeTemplatePayload(): string {
+  const s = t();
+  return serializeDashboard(getHomeTemplate(s.homeTitle, s));
+}
+
+export async function openHomeDashboard(plugin: CommandHost): Promise<void> {
+  const homePath = normalizePath(homeDashboardPath(plugin.settings));
   const existing = plugin.app.vault.getAbstractFileByPath(homePath);
   let file: TFile;
   if (existing instanceof TFile) {
     file = existing;
   } else {
-    if (!plugin.app.vault.getAbstractFileByPath(folder)) {
-      await plugin.app.vault.createFolder(folder);
-    }
-    file = await plugin.app.vault.create(
-      homePath,
-      serializeDashboard(getHomeTemplate(DEFAULT_HOME_FILENAME))
-    );
+    const folder = parentFolder(homePath);
+    if (folder) await ensureFolder(plugin, folder);
+    file = await plugin.app.vault.create(homePath, homeTemplatePayload());
     new Notice(`Home dashboard created at ${homePath}`);
   }
   await openInDashboardView(plugin, file);
 }
 
-async function resetHomeDashboard(plugin: Plugin): Promise<void> {
-  const folder = normalizePath(DEFAULT_DASHBOARD_FOLDER);
-  const homePath = `${folder}/${DEFAULT_HOME_FILENAME}.${DASHBOARD_EXTENSION}`;
+async function resetHomeDashboard(plugin: CommandHost): Promise<void> {
+  const homePath = normalizePath(homeDashboardPath(plugin.settings));
   const existing = plugin.app.vault.getAbstractFileByPath(homePath);
 
   const confirmed = await confirmModal(
@@ -301,15 +314,14 @@ async function resetHomeDashboard(plugin: Plugin): Promise<void> {
   );
   if (!confirmed) return;
 
-  const payload = serializeDashboard(getHomeTemplate(DEFAULT_HOME_FILENAME));
+  const payload = homeTemplatePayload();
   if (existing instanceof TFile) {
     await plugin.app.vault.modify(existing, payload);
     new Notice(`Home dashboard reset: ${homePath}`);
     await openInDashboardView(plugin, existing);
   } else {
-    if (!plugin.app.vault.getAbstractFileByPath(folder)) {
-      await plugin.app.vault.createFolder(folder);
-    }
+    const folder = parentFolder(homePath);
+    if (folder) await ensureFolder(plugin, folder);
     const created = await plugin.app.vault.create(homePath, payload);
     new Notice(`Home dashboard created from template: ${homePath}`);
     await openInDashboardView(plugin, created);

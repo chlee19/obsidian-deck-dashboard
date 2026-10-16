@@ -4,15 +4,16 @@ import { GoogleAuthModal } from "./GoogleAuthModal";
 import { SheetsSync, SyncScope } from "../sync/sheetsSync";
 import { AutoSyncWatcher } from "../sync/autoSyncWatcher";
 import { loadMailConfig, saveMailConfig } from "../core/mailConfig";
+import { renderDeckSettings, type SettingsSectionHost } from "./DeckSettingsSection";
 
 /**
  * Settings tab under "Deck" in Obsidian → Settings → Community plugins.
- * Surfaces the same operations as the command palette: authenticate, set up
- * personal/org spreadsheets, kick off a sync, toggle auto-sync, configure
- * self-owner.
+ * Starts with the home dashboard and folders, then surfaces the same
+ * operations as the command palette: authenticate, set up personal/org
+ * spreadsheets, kick off a sync, toggle auto-sync, configure self-owner.
  */
 export class SyncSettingsTab extends PluginSettingTab {
-  constructor(app: App, private plugin: Plugin) {
+  constructor(app: App, private plugin: Plugin & SettingsSectionHost) {
     super(app, plugin);
   }
 
@@ -26,6 +27,7 @@ export class SyncSettingsTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    renderDeckSettings(containerEl, this.app, this.plugin);
     await this.renderGoogleAuthSection(containerEl);
     await this.renderSelfOwnerSection(containerEl);
     await this.renderScopeSection(containerEl, "personal", "個人タスク");
@@ -64,7 +66,7 @@ export class SyncSettingsTab extends PluginSettingTab {
     new Setting(section)
       .setName("self_owner")
       .setDesc(
-        "個人スコープが対象とするフォルダ名。タスク/詳細/{この名前}/*.md が個人タスク扱い"
+        "個人スコープが対象とするフォルダ名。<タスクのフォルダ>/{この名前}/*.md が個人タスク扱い。組織シートの同期には必須"
       )
       .addText((t) => {
         t.setValue(config.self_owner ?? "");
@@ -160,7 +162,7 @@ export class SyncSettingsTab extends PluginSettingTab {
     new Setting(section)
       .setName("ファイル変更時に自動同期")
       .setDesc(
-        "タスク/詳細/*.md を更新すると 2秒のデバウンス後に自動同期します。変更を反映するにはプラグインを再読み込みしてください。"
+        "タスクのフォルダの .md を更新すると 2秒のデバウンス後に自動同期します。変更を反映するにはプラグインを再読み込みしてください。"
       )
       .addToggle((tog) => {
         tog.setValue(enabled);

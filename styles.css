@@ -172,6 +172,19 @@
   margin: 0;
 }
 
+/* Shown when a widget's folder/file is not configured yet */
+.nd-setup-notice {
+  font-style: normal;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.nd-setup-notice p {
+  margin: 0;
+}
+
 .nd-error {
   color: var(--text-error);
   background: var(--background-modifier-error);

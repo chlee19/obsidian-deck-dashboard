@@ -2,6 +2,9 @@ import { Notice, Setting, TFile } from "obsidian";
 import type { App } from "obsidian";
 import type { WidgetDefinition, WidgetContext } from "./types";
 import { AIDelegationModal } from "../ui/AIDelegationModal";
+import { effectiveFolder } from "../core/settings";
+import { t } from "../core/i18n";
+import { renderFolderNotice } from "./setupNotice";
 
 /** Desktop FileSystemAdapter exposes getBasePath(); not in public typings. */
 interface FileSystemAdapterLike {
@@ -57,23 +60,27 @@ export const kanbanWidget: WidgetDefinition<Settings> = {
   description:
     "フォルダ内のノートを frontmatter のステータス列でカンバン表示。カードをドラッグして状態変更。",
   defaultSettings: () => ({
-    folder: "タスク/詳細",
+    folder: "",
     statusField: "status",
     columns: ["未着手", "作業中", "レビュー待ち", "完了"],
     showFields: ["PJT", "期限", "優先度"],
     hideCompleted: false,
   }),
   async render(el, settings, ctx) {
-    await renderKanban(el, settings, ctx);
+    const folder = effectiveFolder(settings.folder, ctx.settings.taskFolder);
+    if (!folder) {
+      el.empty();
+      renderFolderNotice(el, ctx, t().taskFolderName);
+      return;
+    }
+    await renderKanban(el, { ...settings, folder }, ctx);
   },
   renderSettingsForm(container, settings, onChange) {
     new Setting(container)
       .setName("ソースフォルダ")
-      .setDesc("frontmatterにstatusを持つノートが置かれているフォルダ")
-      .addText((t) =>
-        t.setValue(settings.folder).onChange((v) =>
-          onChange({ ...settings, folder: v.trim() || "タスク/詳細" })
-        )
+      .setDesc(`frontmatterにstatusを持つノートが置かれているフォルダ。${t().inheritFolderHint}`)
+      .addText((text) =>
+        text.setValue(settings.folder).onChange((v) => onChange({ ...settings, folder: v.trim() }))
       );
     new Setting(container)
       .setName("ステータスのfrontmatterキー名")
@@ -212,6 +219,8 @@ async function renderKanban(
             app: ctx.app,
             taskFile: f,
             vaultRoot,
+            logFolder: ctx.settings.aiLogFolder,
+            openSettings: ctx.openSettings,
             statusField: settings.statusField,
             successStatus: pickSuccessStatus(settings.columns),
           }).open();
