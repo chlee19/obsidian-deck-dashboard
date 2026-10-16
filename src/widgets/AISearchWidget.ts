@@ -352,10 +352,8 @@ export const aiSearchWidget: WidgetDefinition<Settings> = {
       e.stopImmediatePropagation();
       void submit();
     };
-    activeDocument.addEventListener("keydown", cmdEnterHandler, true);
-    ctx.parent.register(() => {
-      activeDocument.removeEventListener("keydown", cmdEnterHandler, true);
-    });
+    // ctx.parent is unloaded before the next render, which removes this.
+    ctx.parent.registerDomEvent(activeDocument, "keydown", cmdEnterHandler, { capture: true });
     // Fallback for environments where document-capture is unreachable.
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

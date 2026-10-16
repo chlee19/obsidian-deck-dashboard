@@ -1,4 +1,6 @@
 import { Notice, Plugin, TextFileView, WorkspaceLeaf } from "obsidian";
+import type { Component } from "obsidian";
+import { RenderScope } from "./renderScope";
 import { VIEW_TYPE_DASHBOARD } from "./constants";
 import {
   parseDashboard,
@@ -18,6 +20,8 @@ export class DashboardView extends TextFileView {
   private dashboard: Dashboard = createDefaultDashboard("Untitled");
   private editMode = false;
   private plugin: DashboardHost;
+  /** Everything widgets register lives here and is released on re-render. */
+  private readonly renders = new RenderScope(this);
 
   constructor(leaf: WorkspaceLeaf, plugin: DashboardHost) {
     super(leaf);
@@ -62,6 +66,7 @@ export class DashboardView extends TextFileView {
   }
 
   async onClose(): Promise<void> {
+    this.renders.dispose();
     this.containerEl.children[1].empty();
   }
 
@@ -109,6 +114,7 @@ export class DashboardView extends TextFileView {
 
   private render(): void {
     const container = this.containerEl.children[1] as HTMLElement;
+    const renderScope = this.renders.next();
     container.empty();
     container.addClass("deck-dashboard-view");
 
@@ -153,7 +159,7 @@ export class DashboardView extends TextFileView {
     for (const item of items) {
       const widget = this.dashboard.widgets[item.i];
       if (!widget) continue;
-      this.renderWidget(grid, item, widget);
+      this.renderWidget(grid, item, widget, renderScope);
     }
   }
 
@@ -161,7 +167,12 @@ export class DashboardView extends TextFileView {
     return [...this.dashboard.layout].sort((a, b) => a.y - b.y || a.x - b.x);
   }
 
-  private renderWidget(grid: HTMLElement, layout: LayoutItem, widget: WidgetInstance): void {
+  private renderWidget(
+    grid: HTMLElement,
+    layout: LayoutItem,
+    widget: WidgetInstance,
+    renderScope: Component
+  ): void {
     const wrap = grid.createDiv({ cls: "nd-widget" });
     wrap.dataset.layoutId = layout.i;
     wrap.style.setProperty("--nd-col-span", String(Math.max(1, Math.min(12, layout.w))));
@@ -274,7 +285,7 @@ export class DashboardView extends TextFileView {
       def.render(body, widget.settings, {
         app: this.app,
         plugin: this.plugin,
-        parent: this,
+        parent: this.renders.child(renderScope),
         sourcePath,
         settings: this.plugin.settings,
         openSettings: () => this.plugin.openSettings(),
@@ -329,6 +340,7 @@ export class DashboardView extends TextFileView {
 
   private renderError(message: string): void {
     const container = this.containerEl.children[1] as HTMLElement;
+    this.renders.dispose();
     container.empty();
     container.createEl("h2", { text: "Failed to load dashboard" });
     container.createEl("pre", { text: message });
