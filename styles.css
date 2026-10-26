@@ -1367,3 +1367,97 @@
 .deck-input-full { width: 100%; }
 .deck-input-mono { font-family: var(--font-monospace); }
 .deck-spacer { flex: 1; }
+
+/* ===== Fluid layout (LifeOS patch 2026-10-24) =====
+   A 12-column grid on 8px rows. Each widget is placed inline with
+   grid-column and grid-row, and its height is set to rows * 8px - 12px. */
+.nd-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 8px;
+  column-gap: 12px;
+  row-gap: 0;
+  align-items: start;
+  position: relative;
+}
+.nd-grid.nd-stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+.nd-widget {
+  box-sizing: border-box;
+  position: relative;
+}
+.nd-widget-inner {
+  min-width: 0;
+  display: flow-root; /* keeps the last paragraph's margin inside, so the measured height is the real height */
+}
+.nd-collapse-toggle {
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+  width: 1.1em;
+  text-align: center;
+  flex: none;
+}
+.nd-collapse-toggle:hover {
+  color: var(--text-normal);
+}
+.nd-widget.nd-collapsed .nd-widget-body {
+  display: none;
+}
+.nd-widget.nd-collapsed .nd-widget-head {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom-color: transparent;
+}
+.nd-grid.nd-edit:not(.nd-stack) .nd-widget-head {
+  cursor: grab;
+  touch-action: none;
+}
+.nd-grid.nd-edit .nd-widget-title {
+  user-select: none;
+}
+.nd-widget.nd-dragging {
+  z-index: 20;
+  opacity: 0.93;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  border-style: solid;
+}
+.nd-widget.nd-dragging .nd-widget-head {
+  cursor: grabbing;
+}
+.nd-drop-slot {
+  box-sizing: border-box;
+  border: 2px dashed var(--interactive-accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  pointer-events: none;
+}
+.nd-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0.75;
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(135deg,
+    transparent 0 50%, var(--interactive-accent) 50% 58%,
+    transparent 58% 70%, var(--interactive-accent) 70% 78%,
+    transparent 78% 90%, var(--interactive-accent) 90% 98%, transparent 98%);
+}
+.nd-resize-handle:hover {
+  opacity: 1;
+}
+.nd-widget-controls button.nd-fit-toggle.is-on {
+  color: var(--interactive-accent);
+}
+@media (max-width: 800px) {
+  .deck-dashboard-view {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

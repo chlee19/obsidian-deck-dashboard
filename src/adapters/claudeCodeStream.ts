@@ -74,6 +74,8 @@ export function runClaudeStream(opts: {
   onEvent: (e: StreamEvent) => void;
   timeoutMs?: number;
 }): ClaudeStreamSession {
+  // LifeOS build: no subprocesses. Widget settings must never lead to a command being run.
+  throw new Error("Claude Code is disabled in this build of Deck.");
   if (!Platform.isDesktop) {
     throw new Error(t().claudeCodeStreamClaudeStreamingWorksOnlyOn);
   }

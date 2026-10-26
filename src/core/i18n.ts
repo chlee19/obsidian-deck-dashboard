@@ -7,6 +7,16 @@ export type CommandRejectReason = "empty" | "control-chars" | "not-allowed" | "n
 // picked when Obsidian runs in a ja locale. Older UI text that is still
 // hard-coded in Japanese is migrated here gradually.
 export interface Strings {
+  dashboardEditLayout: string;
+  dashboardDoneEditing: string;
+  dashboardNoWidgetsMobile: string;
+  dashboardDragTitleToMove: string;
+  dashboardCollapseOrExpand: string;
+  dashboardReloadWidget: string;
+  dashboardWidgetSettings: string;
+  dashboardResizeHint: string;
+  dashboardFitOn: string;
+  dashboardFitOff: string;
   doneLabel: string;
   nothingToSync: string;
   neverSynced: string;
@@ -561,6 +571,16 @@ export interface Strings {
 }
 
 const en: Strings = {
+  dashboardEditLayout: "✎ Edit layout",
+  dashboardDoneEditing: "✓ Done editing",
+  dashboardNoWidgetsMobile: "No widgets yet. Add them from the desktop.",
+  dashboardDragTitleToMove: "Drag the title bar to move",
+  dashboardCollapseOrExpand: "Collapse or expand",
+  dashboardReloadWidget: "Reload this widget",
+  dashboardWidgetSettings: "Widget settings",
+  dashboardResizeHint: "Drag to resize. Double-click to fit the height to the content.",
+  dashboardFitOn: "Height fits the content. Click to pin the current height.",
+  dashboardFitOff: "Height is pinned. Click to fit the content.",
   doneLabel: "Done",
   nothingToSync: "nothing to sync",
   neverSynced: "Never synced",
@@ -1181,6 +1201,16 @@ Task from Sheets. See the sheet for details.
 };
 
 const ja: Strings = {
+  dashboardEditLayout: "✎ レイアウト編集",
+  dashboardDoneEditing: "✓ 編集を終了",
+  dashboardNoWidgetsMobile: "ウィジェットがありません。デスクトップ版から追加してください。",
+  dashboardDragTitleToMove: "タイトルバーをドラッグして移動",
+  dashboardCollapseOrExpand: "折りたたむ / 開く",
+  dashboardReloadWidget: "このウィジェットを再読み込み",
+  dashboardWidgetSettings: "ウィジェットの設定",
+  dashboardResizeHint: "ドラッグでサイズ変更。ダブルクリックで高さを内容に合わせます。",
+  dashboardFitOn: "高さは内容に合わせています。クリックで今の高さに固定します。",
+  dashboardFitOff: "高さは固定です。クリックで内容に合わせます。",
   doneLabel: "完了",
   nothingToSync: "対象なし",
   neverSynced: "未同期",

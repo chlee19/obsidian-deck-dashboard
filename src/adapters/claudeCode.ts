@@ -23,6 +23,8 @@ export async function runClaudeP(
   claudeCmd: string,
   extraArgs: string[] = []
 ): Promise<ClaudeCodeResponse> {
+  // LifeOS build: no subprocesses. Widget settings must never lead to a command being run.
+  throw new Error("Claude Code is disabled in this build of Deck.");
   if (!Platform.isDesktop) {
     throw new Error(t().claudeCodeClaudePIsOnlySupported);
   }

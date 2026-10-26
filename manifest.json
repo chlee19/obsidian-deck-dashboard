@@ -1,9 +1,9 @@
 {
   "id": "deck-dashboard",
-  "name": "Deck",
+  "name": "Deck (LifeOS)",
   "version": "0.1.0",
   "minAppVersion": "1.7.2",
-  "description": "Draggable widget-grid dashboards that combine tasks, Dataview queries, Bases, notes, calendar, and mail.",
+  "description": "Deck with English text, a fluid drag-and-resize layout, and Claude Code turned off. Built from github.com/chlee19/obsidian-deck-dashboard (branch lifeos).",
   "author": "Yuto Takagi",
   "isDesktopOnly": false
 }

@@ -58,5 +58,6 @@ export function parseDashboard(raw: string): Dashboard {
     title: obj.title,
     layout: obj.layout as LayoutItem[],
     widgets: obj.widgets as Record<string, WidgetInstance>,
+    ...(obj.layoutVersion === 2 ? { layoutVersion: 2 as const } : {}),
   };
 }
