@@ -209,7 +209,7 @@ export function registerCommands(plugin: CommandHost): void {
         const sync = new SheetsSync(plugin.app, plugin, new GoogleOAuth(plugin));
         const cfg = await sync.getConfig();
         const lines: string[] = [];
-        lines.push(t().commandsYourName(cfg.self_owner ?? t().notSetPlaceholder));
+        lines.push(t().commandsYourName(cfg.self_owner ?? t().notSetParenthesized));
         if (cfg.personal?.spreadsheetId) {
           lines.push(
             t().commandsPersonalLastSync(cfg.personal.spreadsheetUrl, cfg.personal.last_sync ?? t().neverSynced)

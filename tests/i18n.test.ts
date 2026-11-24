@@ -49,3 +49,20 @@ describe("strings moved out of the code", () => {
     }
   });
 });
+
+describe("review fixes (PR #3)", () => {
+  it("keeps the parentheses around the not-set label in ja", () => {
+    expect(getStrings("ja").notSetParenthesized).toBe("(未設定)");
+    expect(getStrings("en").notSetParenthesized).toBe("(not set)");
+  });
+
+  it("labels the stop buttons as actions", () => {
+    expect(getStrings("en").aiDelegationStopped).toBe("🛑 Stop");
+    expect(getStrings("en").aiSessionListStopped).toBe("🛑 Stop");
+    expect(getStrings("en").aiLogWriterStopped).toBe("🛑 Stopped");
+  });
+
+  it("tells English users to leave the due date empty, not type 'none'", () => {
+    expect(getStrings("en").taskCreatorYyyyMmDdOrNone).toContain("leave empty");
+  });
+});

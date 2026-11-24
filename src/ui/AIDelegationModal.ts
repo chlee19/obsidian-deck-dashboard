@@ -65,7 +65,7 @@ export class AIDelegationModal extends Modal {
     warn.setText(
       t().aiDelegationThisLetsTheAiEdit +
         t().aiDelegationClosingThisWindowKeepsThe +
-        t().aiDelegationAndTheLogIsWritten(this.opts.settings.aiLogFolder || t().notSetPlaceholder) +
+        t().aiDelegationAndTheLogIsWritten(this.opts.settings.aiLogFolder || t().notSetParenthesized) +
         t().aiDelegationReopenItFromAiAt
     );
 

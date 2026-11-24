@@ -17,6 +17,7 @@ export interface Strings {
   setFirstNotice: (label: string) => string;
   inheritFolderHint: string;
   notSetPlaceholder: string;
+  notSetParenthesized: string;
 
   settingsHomeHeading: string;
   settingsHomeFileName: string;
@@ -571,6 +572,7 @@ const en: Strings = {
   setFirstNotice: (label) => `Set “${label}” in Settings → Deck first.`,
   inheritFolderHint: "Leave empty to use the folder from Settings → Deck.",
   notSetPlaceholder: "Not set",
+  notSetParenthesized: "(not set)",
 
   settingsHomeHeading: "Home dashboard",
   settingsHomeFileName: "Home dashboard file",
@@ -734,7 +736,7 @@ const en: Strings = {
   aiDelegationStarting: "Starting…",
   aiDelegationStartingClaude: "Starting Claude…",
   aiDelegationStatusUpdateFailed: (message) => `Status update failed: ${message}`,
-  aiDelegationStopped: "🛑 Stopped",
+  aiDelegationStopped: "🛑 Stop",
   aiDelegationStopped2: "Stopped",
   aiDelegationText: (value) => `✅ ${value}`,
   aiDelegationThisLetsTheAiEdit: "⚠️  This lets the AI edit files and run shell commands.",
@@ -818,7 +820,7 @@ ${ctxBlock}`,
   aiSessionListNoActiveAiDelegationSessions: "No active AI delegation sessions",
   aiSessionListOpen: "📺 Open",
   aiSessionListRemoveFromList: "Remove from list",
-  aiSessionListStopped: "🛑 Stopped",
+  aiSessionListStopped: "🛑 Stop",
   aiSessionListStopped2: (taskBasename) => `Stopped: ${taskBasename}`,
   aiSessionListTaskFileNotFound: (taskPath) => `Task file not found: ${taskPath}`,
   aiSessionRegistryAiSessionIsAlreadyRunning: (id) => `AI session is already running: ${id}`,
@@ -1167,7 +1169,7 @@ Task from Sheets. See the sheet for details.
   taskCreatorTaskCreatorNewTask: "Task Creator (new task)",
   taskCreatorTaskNameEGPrepare: "Task name (e.g. Prepare proposal slides)",
   taskCreatorWritingDesign: "Writing / Design…",
-  taskCreatorYyyyMmDdOrNone: "YYYY-MM-DD or none",
+  taskCreatorYyyyMmDdOrNone: "YYYY-MM-DD (leave empty for none)",
   todayCreateTodaySNote: "📝 Create today's note",
   todayDailyNotePathFormat: "Daily note path format",
   todayDailyNotesFolder: "Daily notes folder",
@@ -1191,6 +1193,7 @@ const ja: Strings = {
   setFirstNotice: (label) => `先に 設定 → Deck で「${label}」を設定してください。`,
   inheritFolderHint: "空なら 設定 → Deck のフォルダを使います。",
   notSetPlaceholder: "未設定",
+  notSetParenthesized: "(未設定)",
 
   settingsHomeHeading: "ホームダッシュボード",
   settingsHomeFileName: "ホームダッシュボードのファイル",
